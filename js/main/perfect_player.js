@@ -11,8 +11,11 @@
   - Volume on the bottom right with -4% / +4% buttons, a clickable slider,
     a percentage label, and mouse wheel support.
   - A big, readable "current / duration" label in the middle of the panel.
-  - Controls hide 1 second after the cursor leaves the player,
-    or after 3 seconds without cursor movement.
+  - A single click on the video does nothing (no accidental pauses),
+    a double click toggles fullscreen.
+  - Controls hide 0.5 seconds after the cursor leaves the player,
+    or after 2 seconds without cursor movement over the empty video area
+    (never while hovering the panel or seekbar).
 
   Requires: dom.js (the DOM helper object) loaded before this file.
 
@@ -23,7 +26,7 @@
     or manually:
     let player = PerfectPlayer.upgrade(DOM.el(`#my_video`), {volume_step: 5})
 
-  License: GPLv3
+  License: MIT
 */
 
 class PerfectPlayer {
@@ -31,12 +34,14 @@ class PerfectPlayer {
   static defaults = {
     // Volume change in percent for buttons, wheel and arrow keys
     volume_step: 4,
-    // Seconds to skip with the left/right arrow keys
+    // Seconds to skip with the -5s/+5s buttons and left/right arrow keys
     seek_step: 5,
+    // Seconds to skip with the -1m/+1m buttons
+    seek_step_long: 60,
     // Hide controls this many ms after the cursor leaves the player
-    hide_delay_leave: 1000,
-    // Hide controls this many ms after the cursor stops moving
-    hide_delay_idle: 3000,
+    hide_delay_leave: 500,
+    // Hide controls this many ms after the cursor stops moving over empty video
+    hide_delay_idle: 2000,
     // Remember the volume across page loads with localStorage
     remember_volume: true,
     storage_key: `perfect_player_volume`,
@@ -59,6 +64,8 @@ class PerfectPlayer {
     play: `<svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.4-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>`,
     pause: `<svg viewBox="0 0 24 24"><rect x="5.5" y="4" width="4.6" height="16" rx="1.2"/><rect x="13.9" y="4" width="4.6" height="16" rx="1.2"/></svg>`,
     replay: `<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6.5 12 11V8a5 5 0 1 1-5 5H4.5A7.5 7.5 0 1 0 12 5.5z"/></svg>`,
+    rewind: `<svg viewBox="0 0 24 24"><path d="M11.6 17.5V6.5a.8.8 0 0 0-1.3-.62l-6.8 5.5a.8.8 0 0 0 0 1.24l6.8 5.5a.8.8 0 0 0 1.3-.62zm9.4 0V6.5a.8.8 0 0 0-1.3-.62l-6.8 5.5a.8.8 0 0 0 0 1.24l6.8 5.5a.8.8 0 0 0 1.3-.62z"/></svg>`,
+    forward: `<svg viewBox="0 0 24 24"><path d="M12.4 6.5v11a.8.8 0 0 0 1.3.62l6.8-5.5a.8.8 0 0 0 0-1.24l-6.8-5.5a.8.8 0 0 0-1.3.62zM3 6.5v11a.8.8 0 0 0 1.3.62l6.8-5.5a.8.8 0 0 0 0-1.24l-6.8-5.5A.8.8 0 0 0 3 6.5z"/></svg>`,
     minus: `<svg viewBox="0 0 24 24"><rect x="4" y="10.3" width="16" height="3.4" rx="1.2"/></svg>`,
     plus: `<svg viewBox="0 0 24 24"><rect x="4" y="10.3" width="16" height="3.4" rx="1.2"/><rect x="10.3" y="4" width="3.4" height="16" rx="1.2"/></svg>`,
     fullscreen: `<svg viewBox="0 0 24 24"><path d="M4 9V4h5v2.2H6.2V9zM15 4h5v5h-2.2V6.2H15zM20 15v5h-5v-2.2h2.8V15zM9 20H4v-5h2.2v2.8H9z"/></svg>`,
@@ -107,6 +114,15 @@ class PerfectPlayer {
     return Math.min(max, Math.max(min, num))
   }
 
+  // Format a skip duration like 5 -> "5s", 60 -> "1m"
+  static format_step = (secs) => {
+    if ((secs >= 60) && ((secs % 60) === 0)) {
+      return `${secs / 60}m`
+    }
+
+    return `${secs}s`
+  }
+
   constructor(video, options = {}) {
     this.video = DOM.element(video)
 
@@ -126,6 +142,8 @@ class PerfectPlayer {
     this.last_spark = 0
     this.spark_count = 0
     this.pointer_inside = false
+    this.over_controls = false
+    this.last_icon = ``
     this.reduced_motion = window.matchMedia(`(prefers-reduced-motion: reduce)`).matches
 
     this.build()
@@ -157,15 +175,17 @@ class PerfectPlayer {
     }
 
     let icons = PerfectPlayer.icons
+    let step = PerfectPlayer.format_step(this.options.seek_step)
+    let long_step = PerfectPlayer.format_step(this.options.seek_step_long)
     let fs_button = ``
 
     if (this.options.fullscreen_button) {
       fs_button = `<button class="pvp_button pvp_fullscreen" type="button" aria-label="Fullscreen" title="Fullscreen (F)">${icons.fullscreen}</button>`
     }
 
-    // The stage catches clicks on the video. The controls layer sits above
-    // it but only the seekbar and the panel receive pointer events, so a
-    // click on either of them never reaches the stage.
+    // The stage catches double-clicks on the empty video area. The controls
+    // layer sits above it, and only the seekbar, skip buttons, and panel
+    // receive pointer events so clicks on them never reach the stage.
     root.innerHTML = `
       <div class="pvp_stage">
         <div class="pvp_flash"></div>
@@ -173,6 +193,24 @@ class PerfectPlayer {
       </div>
       <div class="pvp_controls">
         <div class="pvp_seek_zone">
+          <div class="pvp_seek_actions">
+            <div class="pvp_skip_group">
+              <button class="pvp_button pvp_skip pvp_rewind_long" type="button" aria-label="Rewind ${long_step}" title="Rewind ${long_step}">
+                ${icons.rewind}<span>-${long_step}</span>
+              </button>
+              <button class="pvp_button pvp_skip pvp_rewind" type="button" aria-label="Rewind ${step}" title="Rewind ${step} (Left)">
+                ${icons.rewind}<span>-${step}</span>
+              </button>
+            </div>
+            <div class="pvp_skip_group">
+              <button class="pvp_button pvp_skip pvp_forward" type="button" aria-label="Forward ${step}" title="Forward ${step} (Right)">
+                <span>+${step}</span>${icons.forward}
+              </button>
+              <button class="pvp_button pvp_skip pvp_forward_long" type="button" aria-label="Forward ${long_step}" title="Forward ${long_step}">
+                <span>+${long_step}</span>${icons.forward}
+              </button>
+            </div>
+          </div>
           <div class="pvp_seek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="pvp_seek_track">
               <div class="pvp_seek_buffer"></div>
@@ -186,7 +224,9 @@ class PerfectPlayer {
         </div>
         <div class="pvp_panel">
           <div class="pvp_left">
-            <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">${icons.play}</button>
+            <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">
+              <span class="pvp_play_core"><span class="pvp_play_icon">${icons.play}</span></span>
+            </button>
             ${fs_button}
           </div>
           <div class="pvp_time" aria-live="off">
@@ -214,9 +254,10 @@ class PerfectPlayer {
     this.root = root
 
     let names = [
-      `stage`, `flash`, `spinner`, `seek`, `seek_track`, `seek_buffer`,
-      `seek_hover`, `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`,
-      `play`, `fullscreen`, `current`, `duration`, `volume`, `vol_down`,
+      `stage`, `flash`, `spinner`, `rewind`, `rewind_long`, `forward`,
+      `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
+      `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
+      `play_icon`, `fullscreen`, `current`, `duration`, `volume`, `vol_down`,
       `vol_slider`, `vol_fill`, `vol_thumb`, `vol_up`, `vol_label`,
     ]
 
@@ -274,17 +315,28 @@ class PerfectPlayer {
     })
   }
 
-  // Clicking/tapping the video toggles playback
+  // Double clicking the video toggles fullscreen. A single click on the
+  // video does nothing on purpose: playback is only controlled by the play
+  // button (or keyboard), so a stray click can never pause the video.
   setup_stage = () => {
+    DOM.ev(this.els.stage, `dblclick`, () => {
+      this.toggle_fullscreen()
+    })
+
+    // On touch there is no hover, so a tap toggles the controls instead
     DOM.ev(this.els.stage, `click`, (e) => {
-      // On touch, the first tap on hidden controls just reveals them
-      if ((e.pointerType === `touch`) && this.is_idle()) {
-        this.show_controls()
-        this.schedule_hide(this.options.hide_delay_idle)
+      if (e.pointerType !== `touch`) {
         return
       }
 
-      this.toggle_play()
+      if (this.is_idle()) {
+        this.show_controls()
+        this.schedule_hide(this.options.hide_delay_idle)
+      }
+      else {
+        this.clear_hide()
+        this.hide_controls()
+      }
     })
   }
 
@@ -303,6 +355,7 @@ class PerfectPlayer {
       this.root.classList.add(`pvp_seeking`)
       this.clear_hide()
       this.drag_ratio = this.seek_ratio(e)
+      this.update_seek_hover(this.drag_ratio)
       this.request_seek()
       this.render_progress(this.drag_ratio)
       this.burst(this.drag_ratio, 10)
@@ -342,6 +395,23 @@ class PerfectPlayer {
     DOM.ev(seek, `pointerenter`, () => {
       seek.classList.add(`pvp_hovering`)
     })
+
+    // Rewind and forward skip buttons sitting above the seekbar ends
+    DOM.ev(this.els.rewind, `click`, () => {
+      this.skip(-this.options.seek_step)
+    })
+
+    DOM.ev(this.els.rewind_long, `click`, () => {
+      this.skip(-this.options.seek_step_long)
+    })
+
+    DOM.ev(this.els.forward, `click`, () => {
+      this.skip(this.options.seek_step)
+    })
+
+    DOM.ev(this.els.forward_long, `click`, () => {
+      this.skip(this.options.seek_step_long)
+    })
   }
 
   // Bottom panel: play, fullscreen, ripples
@@ -367,8 +437,15 @@ class PerfectPlayer {
       })
     }
 
-    // Note: clicks on the panel background do nothing on purpose. The panel
-    // is a sibling of the stage (not a child), so they never toggle playback.
+    // Single clicks on the panel background do nothing; double-clicking the
+    // empty panel background toggles fullscreen (ignoring rapid clicks on buttons).
+    DOM.ev(this.els.panel, `dblclick`, (e) => {
+      if (DOM.parent(e.target, [`button`, `.pvp_vol_slider`])) {
+        return
+      }
+
+      this.toggle_fullscreen()
+    })
   }
 
   // Volume: -/+ buttons (with hold to repeat), slider, label, wheel
@@ -527,8 +604,41 @@ class PerfectPlayer {
     })
   }
 
-  // Controls appear on movement, hide after idle time or leaving the player
+  // Controls appear on movement, hide after leaving the player or sitting
+  // idle over the empty video area (never while hovering the controls).
   setup_autohide = () => {
+    let control_areas = [
+      this.els.panel,
+      this.els.seek,
+      this.els.rewind,
+      this.els.rewind_long,
+      this.els.forward,
+      this.els.forward_long,
+    ]
+
+    for (let el of control_areas) {
+      DOM.ev(el, `pointerenter`, (e) => {
+        if (e.pointerType === `touch`) {
+          return
+        }
+
+        this.over_controls = true
+        this.clear_hide()
+      })
+
+      DOM.ev(el, `pointerleave`, (e) => {
+        if (e.pointerType === `touch`) {
+          return
+        }
+
+        this.over_controls = false
+
+        if (this.pointer_inside) {
+          this.schedule_hide(this.options.hide_delay_idle)
+        }
+      })
+    }
+
     DOM.ev(this.root, `pointermove`, (e) => {
       // Touch "moves" while tapping, those are handled by the stage click
       if (e.pointerType === `touch`) {
@@ -536,8 +646,15 @@ class PerfectPlayer {
       }
 
       this.pointer_inside = true
+      this.over_controls = Boolean(DOM.parent(e.target, [`.pvp_panel`, `.pvp_seek`, `.pvp_skip`]))
       this.show_controls()
-      this.schedule_hide(this.options.hide_delay_idle)
+
+      if (this.over_controls) {
+        this.clear_hide()
+      }
+      else {
+        this.schedule_hide(this.options.hide_delay_idle)
+      }
     })
 
     DOM.ev(this.root, `pointerleave`, (e) => {
@@ -546,6 +663,7 @@ class PerfectPlayer {
       }
 
       this.pointer_inside = false
+      this.over_controls = false
       this.schedule_hide(this.options.hide_delay_leave)
     })
   }
@@ -594,6 +712,10 @@ class PerfectPlayer {
   }
 
   skip = (secs) => {
+    if (!this.can_seek()) {
+      return
+    }
+
     this.seek_to(this.video.currentTime + secs)
     this.burst(this.video.currentTime / this.video.duration, 6)
   }
@@ -721,8 +843,8 @@ class PerfectPlayer {
   }
 
   hide_controls = () => {
-    // Never hide in the middle of a drag
-    if (this.dragging_seek || this.dragging_volume) {
+    // Never hide during a drag or while the cursor rests on controls
+    if (this.dragging_seek || this.dragging_volume || this.over_controls) {
       return
     }
 
@@ -769,11 +891,20 @@ class PerfectPlayer {
     let playing = !video.paused && !video.ended
     let icons = PerfectPlayer.icons
     this.root.classList.toggle(`pvp_playing`, playing)
-    let icon = playing ? icons.pause : (video.ended ? icons.replay : icons.play)
+    let icon = playing ? `pause` : (video.ended ? `replay` : `play`)
     let label = playing ? `Pause` : (video.ended ? `Replay` : `Play`)
-    this.els.play.innerHTML = icon
     this.els.play.setAttribute(`aria-label`, label)
     this.els.play.title = `${label} (Space)`
+
+    // Only swap (and animate) the icon when it actually changes
+    if (icon !== this.last_icon) {
+      let el = this.els.play_icon
+      el.innerHTML = icons[icon]
+      el.classList.remove(`pvp_pop`)
+      void el.offsetWidth
+      el.classList.add(`pvp_pop`)
+      this.last_icon = icon
+    }
   }
 
   // Smooth progress while playing. The loop only runs while the video is
@@ -815,7 +946,12 @@ class PerfectPlayer {
     this.els.seek_thumb.style.left = percent
     this.els.seek.setAttribute(`aria-valuenow`, Math.round(ratio * 100))
     let live = video.duration === Infinity
-    this.root.classList.toggle(`pvp_no_seek`, !this.can_seek())
+    let seekable = this.can_seek()
+    this.root.classList.toggle(`pvp_no_seek`, !seekable)
+    this.els.rewind.disabled = !seekable
+    this.els.rewind_long.disabled = !seekable
+    this.els.forward.disabled = !seekable
+    this.els.forward_long.disabled = !seekable
 
     if (this.dragging_seek) {
       this.els.current.textContent = PerfectPlayer.format_time(ratio * video.duration)
@@ -870,7 +1006,7 @@ class PerfectPlayer {
   update_seek_hover = (ratio) => {
     let percent = `${ratio * 100}%`
     this.els.seek_hover.style.width = percent
-    this.els.seek_tip.style.left = percent
+    this.els.seek_tip.style.setProperty(`--pvp_tip_x`, percent)
     this.els.seek_tip.textContent = PerfectPlayer.format_time(ratio * this.video.duration)
   }
 

@@ -17,13 +17,13 @@ some random point of the video.
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                                                      │
+│                       ( ▶ )                          │  ← play/pause feedback at the top
+│  [« -1m] [« -5s]                    [+5s »] [+1m »]  │  ← quick skip buttons
 │                                                      │
 │   ━━━━━━━━━━━━━━━━━━━●───────────────────────────    │  ← big seekbar, in the middle
 │                                                      │
-│                                                      │
 │ ┌──────────────────────────────────────────────────┐ │
-│ │ [ ▶ ] [⛶]        2:36 / 10:00        [-]━━●[+] 64% │ │  ← panel
+│ │ [ ▶ ] [ ⛶ ]      2:36 / 10:00        [-]━━●[+] 64% │ │  ← panel
 │ └──────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────┘
 ```
@@ -32,8 +32,12 @@ some random point of the video.
 
 - **Big seekbar in the middle of the video.** Easy to click, easy to drag,
   with a generous (but not huge) hit area, and far away from every button.
-  Hovering shows the time under the cursor.
-- **Big play/pause button** on the bottom left.
+  Hovering shows a big, easy-to-read LCD timestamp above the bar.
+- **Quick `-1m` / `-5s` and `+5s` / `+1m` buttons** well above the left and
+  right ends of the seekbar (`-1m` / `+1m` on the outer edges), so you can jump
+  back or forward without aiming on the track.
+- **Big play/pause and fullscreen buttons** on the bottom left, matching in
+  size, with a machined chrome bezel and glossy aqua core on play/pause.
 - **Volume you can actually control precisely** on the bottom right:
   - a `-` button and a `+` button (4% steps, hold to repeat),
   - a regular clickable/draggable slider,
@@ -42,11 +46,14 @@ some random point of the video.
   - The volume is remembered between visits.
 - **Big, readable time** (`2:36 / 10:00`) in a green LCD readout in the
   middle of the panel.
-- **No misclicks on the panel.** Clicking the panel background does nothing.
-  Clicking the video toggles playback, clicking the seekbar only seeks.
-- **Controls get out of the way.** They hide 1 second after the cursor leaves
-  the player, or after 3 seconds without moving the cursor. The cursor hides
-  too. They never hide in the middle of a drag.
+- **No accidental pauses or misclicks.** Single-clicking the empty video area
+  or the panel background does nothing; double-clicking either toggles
+  fullscreen. Play/pause feedback pops cleanly near the top so the seekbar
+  never blocks it.
+- **Controls get out of the way.** They hide 0.5 seconds after the cursor
+  leaves the player, or after 2 seconds without moving over the empty video
+  area. They stay visible while the cursor rests on the bottom panel or
+  seekbar, and never hide in the middle of a drag. The cursor hides too.
 - **Looks good.** Glossy metal and glass inspired by Windows 98/XP, Winamp and
   FL Studio, kept clean and minimal.
 - **Pleasant, but cheap, effects.** Sparks fly from the seekbar when you click
@@ -126,9 +133,10 @@ PerfectPlayer.upgrade_all(`.article video`)
 | Option              | Default                 | Description                                         |
 |---------------------|-------------------------|-----------------------------------------------------|
 | `volume_step`       | `4`                     | Percent per button press, wheel tick or arrow key   |
-| `seek_step`         | `5`                     | Seconds for the left/right arrow keys               |
-| `hide_delay_leave`  | `1000`                  | ms to hide controls after the cursor leaves         |
-| `hide_delay_idle`   | `3000`                  | ms to hide controls after the cursor stops moving   |
+| `seek_step`         | `5`                     | Seconds for `-5s`/`+5s` and left/right arrow keys   |
+| `seek_step_long`    | `60`                    | Seconds for the `-1m`/`+1m` buttons                 |
+| `hide_delay_leave`  | `500`                   | ms to hide controls after the cursor leaves         |
+| `hide_delay_idle`   | `2000`                  | ms to hide controls after idle on empty video area  |
 | `remember_volume`   | `true`                  | Save the volume in `localStorage`                   |
 | `storage_key`       | `perfect_player_volume` | `localStorage` key for the volume                   |
 | `fullscreen_button` | `true`                  | Show the small fullscreen button next to play       |
@@ -196,5 +204,4 @@ pointer events, container queries and `backdrop-filter`.
 
 ## License
 
-[GPLv3](LICENSE)
-
+[MIT](LICENSE)
