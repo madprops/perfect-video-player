@@ -54,6 +54,9 @@ class PerfectPlayer {
   // Every player created so far
   static instances = []
 
+  // Lookup table from <video> element to its PerfectPlayer instance
+  static map = new WeakMap()
+
   // Maximum sparks alive at the same time per player (keeps it cheap)
   static max_sparks = 36
 
@@ -70,8 +73,62 @@ class PerfectPlayer {
     fullscreen_exit: `<svg viewBox="0 0 24 24"><path d="M9 4v5H4V6.8h2.8V4zM20 9h-5V4h2.2v2.8H20zM15 20v-5h5v2.2h-2.8V20zM4 15h5v5H6.8v-2.8H4z"/></svg>`,
   }
 
+  // Return the existing PerfectPlayer instance for a <video> (or selector)
+  static get = (video) => {
+    let el = (typeof video === `string`) ? document.querySelector(video) : video
+
+    if (!el) {
+      return null
+    }
+
+    return PerfectPlayer.map.get(el) || null
+  }
+
+  // Parse data-pvp-* attributes on a <video> into an options object
+  static read_data_options = (video) => {
+    let parsed = {}
+
+    for (let [key, def] of Object.entries(PerfectPlayer.defaults)) {
+      let camel = key.replace(/_([a-z])/g, (_, ch) => ch.toUpperCase())
+      let attr = `pvp${camel[0].toUpperCase()}${camel.slice(1)}`
+
+      if (!(attr in video.dataset)) {
+        continue
+      }
+
+      let raw = video.dataset[attr].trim()
+
+      if (typeof def === `boolean`) {
+        if ((raw === ``) || (raw === `true`) || (raw === `1`)) {
+          parsed[key] = true
+        }
+        else if ((raw === `false`) || (raw === `0`)) {
+          parsed[key] = false
+        }
+      }
+      else if (typeof def === `number`) {
+        let num = Number(raw)
+
+        if (Number.isFinite(num)) {
+          parsed[key] = num
+        }
+      }
+      else {
+        parsed[key] = raw
+      }
+    }
+
+    return parsed
+  }
+
   // Upgrade a single <video> element (or selector) into a Perfect Player
   static upgrade = (video, options = {}) => {
+    let existing = PerfectPlayer.get(video)
+
+    if (existing) {
+      return existing
+    }
+
     return new PerfectPlayer(video, options)
   }
 
@@ -80,7 +137,7 @@ class PerfectPlayer {
     let players = []
 
     for (let video of document.querySelectorAll(query)) {
-      if (video.closest(`.pvp`)) {
+      if (PerfectPlayer.get(video) || video.closest(`.pvp`)) {
         continue
       }
 
@@ -128,12 +185,22 @@ class PerfectPlayer {
       throw new Error(`PerfectPlayer: a <video> element is required`)
     }
 
-    this.options = Object.assign({}, PerfectPlayer.defaults, options)
+    this.options = Object.assign(
+      {},
+      PerfectPlayer.defaults,
+      PerfectPlayer.read_data_options(this.video),
+      options,
+    )
+
     this.els = {}
+    this.abort = new AbortController()
     this.hide_timeout = undefined
+    this.save_volume_timeout = undefined
     this.frame_request = undefined
     this.seek_request = undefined
     this.repeat_timeout = undefined
+    this.resize_observer = undefined
+    this.mutation_observer = undefined
     this.dragging_seek = false
     this.dragging_volume = false
     this.drag_ratio = 0
@@ -141,10 +208,12 @@ class PerfectPlayer {
     this.spark_count = 0
     this.pointer_inside = false
     this.over_controls = false
+    this.last_pointer_type = ``
     this.last_icon = ``
     this.reduced_motion = window.matchMedia(`(prefers-reduced-motion: reduce)`).matches
 
     this.build()
+    this.setup_layout()
     this.setup_video()
     this.setup_stage()
     this.setup_seekbar()
@@ -153,20 +222,40 @@ class PerfectPlayer {
     this.setup_keyboard()
     this.setup_autohide()
     this.load_volume()
+    this.update_ratio()
     this.update_all()
+    PerfectPlayer.map.set(this.video, this)
     PerfectPlayer.instances.push(this)
   }
 
   // Wrap the <video> in the player container and create all the controls
   build = () => {
     let video = this.video
+    let parent = video.parentNode
+    let parent_style = getComputedStyle(parent)
+    let video_style = getComputedStyle(video)
     let root = document.createElement(`div`)
     root.className = `pvp`
     root.tabIndex = 0
     root.setAttribute(`role`, `region`)
     root.setAttribute(`aria-label`, `Video player`)
 
-    // Respect an explicit width given to the original video
+    // Preserve column-flex alignment (e.g. centered previews) on the wrapper
+    if (((parent_style.display === `flex`) || (parent_style.display === `inline-flex`)) &&
+      parent_style.flexDirection.startsWith(`column`) &&
+      (parent_style.alignItems !== `normal`) &&
+      (parent_style.alignItems !== `stretch`)) {
+      root.style.display = `flex`
+      root.style.flexDirection = `column`
+      root.style.alignItems = parent_style.alignItems
+    }
+
+    // Preserve explicit 100% height when the host sizes <video> to fill its parent
+    if (video_style.height === `100%`) {
+      root.style.height = `100%`
+    }
+
+    // Respect an explicit width attribute given to the original video
     let width = video.getAttribute(`width`)
 
     if (width) {
@@ -182,78 +271,81 @@ class PerfectPlayer {
       fs_button = `<button class="pvp_button pvp_fullscreen" type="button" aria-label="Fullscreen" title="Fullscreen (F)">${icons.fullscreen}</button>`
     }
 
-    // The stage catches double-clicks on the empty video area. The controls
-    // layer sits above it, and only the seekbar, skip buttons, and panel
-    // receive pointer events so clicks on them never reach the stage.
+    // The overlay tracks the <video>'s exact rendered box. The stage lets
+    // pointer events pass through to <video> so host listeners and the native
+    // context menu keep working; only the seekbar, skip buttons, and panel
+    // capture pointer events.
     root.innerHTML = `
-      <div class="pvp_stage">
-        <div class="pvp_flash"></div>
-        <div class="pvp_spinner"></div>
-      </div>
-      <div class="pvp_controls">
-        <div class="pvp_seek_zone">
-          <div class="pvp_seek_actions">
-            <div class="pvp_skip_group">
-              <button class="pvp_button pvp_skip pvp_rewind_long" type="button" aria-label="Rewind ${long_step}" title="Rewind ${long_step}">
-                ${icons.rewind}<span>-${long_step}</span>
-              </button>
-              <button class="pvp_button pvp_skip pvp_rewind" type="button" aria-label="Rewind ${step}" title="Rewind ${step} (Left)">
-                ${icons.rewind}<span>-${step}</span>
-              </button>
-            </div>
-            <div class="pvp_skip_group">
-              <button class="pvp_button pvp_skip pvp_forward" type="button" aria-label="Forward ${step}" title="Forward ${step} (Right)">
-                <span>+${step}</span>${icons.forward}
-              </button>
-              <button class="pvp_button pvp_skip pvp_forward_long" type="button" aria-label="Forward ${long_step}" title="Forward ${long_step}">
-                <span>+${long_step}</span>${icons.forward}
-              </button>
-            </div>
-          </div>
-          <div class="pvp_seek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-            <div class="pvp_seek_track">
-              <div class="pvp_seek_buffer"></div>
-              <div class="pvp_seek_hover"></div>
-              <div class="pvp_seek_fill"><div class="pvp_seek_shine"></div></div>
-            </div>
-            <div class="pvp_seek_thumb"></div>
-            <div class="pvp_seek_tip">0:00</div>
-            <div class="pvp_sparks"></div>
-          </div>
+      <div class="pvp_overlay">
+        <div class="pvp_stage">
+          <div class="pvp_flash"></div>
+          <div class="pvp_spinner"></div>
         </div>
-        <div class="pvp_panel">
-          <div class="pvp_left">
-            <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">
-              <span class="pvp_play_core"><span class="pvp_play_icon">${icons.play}</span></span>
-            </button>
-            ${fs_button}
-          </div>
-          <div class="pvp_time" aria-live="off">
-            <span class="pvp_current">0:00</span>
-            <span class="pvp_separator">/</span>
-            <span class="pvp_duration">0:00</span>
-          </div>
-          <div class="pvp_volume" title="Volume (wheel, Up/Down)">
-            <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
-            <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
-              <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
-              <div class="pvp_vol_thumb"></div>
+        <div class="pvp_controls">
+          <div class="pvp_seek_zone">
+            <div class="pvp_seek_actions">
+              <div class="pvp_skip_group">
+                <button class="pvp_button pvp_skip pvp_rewind_long" type="button" aria-label="Rewind ${long_step}" title="Rewind ${long_step}">
+                  ${icons.rewind}<span>-${long_step}</span>
+                </button>
+                <button class="pvp_button pvp_skip pvp_rewind" type="button" aria-label="Rewind ${step}" title="Rewind ${step} (Left)">
+                  ${icons.rewind}<span>-${step}</span>
+                </button>
+              </div>
+              <div class="pvp_skip_group">
+                <button class="pvp_button pvp_skip pvp_forward" type="button" aria-label="Forward ${step}" title="Forward ${step} (Right)">
+                  <span>+${step}</span>${icons.forward}
+                </button>
+                <button class="pvp_button pvp_skip pvp_forward_long" type="button" aria-label="Forward ${long_step}" title="Forward ${long_step}">
+                  <span>+${long_step}</span>${icons.forward}
+                </button>
+              </div>
             </div>
-            <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
-            <button class="pvp_vol_label" type="button" title="Mute (M)">100%</button>
+            <div class="pvp_seek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="pvp_seek_track">
+                <div class="pvp_seek_buffer"></div>
+                <div class="pvp_seek_hover"></div>
+                <div class="pvp_seek_fill"><div class="pvp_seek_shine"></div></div>
+              </div>
+              <div class="pvp_seek_thumb"></div>
+              <div class="pvp_seek_tip">0:00</div>
+              <div class="pvp_sparks"></div>
+            </div>
+          </div>
+          <div class="pvp_panel">
+            <div class="pvp_left">
+              <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">
+                <span class="pvp_play_core"><span class="pvp_play_icon">${icons.play}</span></span>
+              </button>
+              ${fs_button}
+            </div>
+            <div class="pvp_time" aria-live="off">
+              <span class="pvp_current">0:00</span>
+              <span class="pvp_separator">/</span>
+              <span class="pvp_duration">0:00</span>
+            </div>
+            <div class="pvp_volume" title="Volume (wheel, Up/Down)">
+              <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
+              <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
+                <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
+                <div class="pvp_vol_thumb"></div>
+              </div>
+              <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
+              <button class="pvp_vol_label" type="button" title="Mute (M)">100%</button>
+            </div>
           </div>
         </div>
       </div>
     `
 
     // Put the container where the video was, then move the video inside it
-    video.parentNode.insertBefore(root, video)
+    parent.insertBefore(root, video)
     root.prepend(video)
     video.classList.add(`pvp_video`)
     this.root = root
 
     let names = [
-      `stage`, `flash`, `spinner`, `rewind`, `rewind_long`, `forward`,
+      `overlay`, `stage`, `flash`, `spinner`, `rewind`, `rewind_long`, `forward`,
       `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
       `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
       `play_icon`, `fullscreen`, `current`, `duration`, `volume`, `vol_down`,
@@ -265,9 +357,69 @@ class PerfectPlayer {
     }
   }
 
+  // Keep the overlay aligned with <video> and mirror hide/show state
+  setup_layout = () => {
+    if (typeof ResizeObserver !== `undefined`) {
+      this.resize_observer = new ResizeObserver(() => {
+        this.sync_overlay()
+      })
+
+      this.resize_observer.observe(this.video)
+      this.resize_observer.observe(this.root)
+    }
+
+    if (typeof MutationObserver !== `undefined`) {
+      this.mutation_observer = new MutationObserver(() => {
+        this.sync_visibility()
+        this.sync_overlay()
+      })
+
+      this.mutation_observer.observe(this.video, {
+        attributes: true,
+        attributeFilter: [`class`, `style`, `hidden`],
+      })
+    }
+
+    this.sync_visibility()
+    this.sync_overlay()
+  }
+
+  // Mirror display: none toggled directly on <video> onto the wrapper
+  sync_visibility = () => {
+    let hidden = getComputedStyle(this.video).display === `none`
+    this.root.classList.toggle(`pvp_hidden`, hidden)
+  }
+
+  // Match .pvp_overlay to the <video>'s exact rendered box inside .pvp
+  sync_overlay = () => {
+    let overlay = this.els.overlay
+
+    if (this.is_fullscreen()) {
+      overlay.classList.remove(`pvp_overlay_hidden`)
+      return
+    }
+
+    let video = this.video
+    let width = video.clientWidth
+    let height = video.clientHeight
+
+    if ((width === 0) || (height === 0)) {
+      overlay.classList.add(`pvp_overlay_hidden`)
+      return
+    }
+
+    overlay.classList.remove(`pvp_overlay_hidden`)
+    overlay.style.left = `${video.offsetLeft + video.clientLeft}px`
+    overlay.style.top = `${video.offsetTop + video.clientTop}px`
+    overlay.style.width = `${width}px`
+    overlay.style.height = `${height}px`
+    overlay.style.borderRadius = getComputedStyle(video).borderRadius
+  }
+
   // Disable native controls and listen to media events
   setup_video = () => {
     let video = this.video
+    let signal = this.abort.signal
     video.controls = false
     video.removeAttribute(`controls`)
     video.playsInline = true
@@ -275,62 +427,75 @@ class PerfectPlayer {
     video.addEventListener(`play`, () => {
       this.update_play_state()
       this.start_frame_loop()
-    })
+    }, {signal})
 
     video.addEventListener(`pause`, () => {
       this.update_play_state()
       this.set_loading(false)
-    })
+    }, {signal})
 
     video.addEventListener(`ended`, () => {
       this.update_play_state()
       this.show_controls()
-    })
+    }, {signal})
 
     for (let event of [`timeupdate`, `seeked`]) {
       video.addEventListener(event, () => {
         this.update_progress()
-      })
+      }, {signal})
     }
 
     for (let event of [`durationchange`, `loadedmetadata`, `emptied`]) {
       video.addEventListener(event, () => {
         this.update_ratio()
         this.update_all()
-      })
+        this.sync_overlay()
+      }, {signal})
     }
 
     video.addEventListener(`progress`, () => {
       this.update_buffer()
-    })
+    }, {signal})
 
     video.addEventListener(`volumechange`, () => {
       this.update_volume()
-      this.save_volume()
-    })
+      this.schedule_save_volume()
+    }, {signal})
 
     video.addEventListener(`waiting`, () => {
       this.set_loading(true)
-    })
+    }, {signal})
 
     for (let event of [`playing`, `canplay`, `seeked`]) {
       video.addEventListener(event, () => {
         this.set_loading(false)
-      })
+      }, {signal})
     }
   }
 
-  // Double clicking the video toggles fullscreen. A single click on the
-  // video does nothing on purpose: playback is only controlled by the play
-  // button (or keyboard), so a stray click can never pause the video.
+  // Double clicking the video toggles fullscreen (unless handled by the host).
+  // A single click on the video does nothing on purpose: playback is only
+  // controlled by the play button (or keyboard), so a stray click can never
+  // pause the video. Listeners live on <video> directly so host events and the
+  // native context menu are never blocked.
   setup_stage = () => {
-    this.els.stage.addEventListener(`dblclick`, () => {
+    let signal = this.abort.signal
+
+    this.video.addEventListener(`pointerdown`, (e) => {
+      this.last_pointer_type = e.pointerType
+    }, {signal})
+
+    this.video.addEventListener(`dblclick`, (e) => {
+      if (e.defaultPrevented) {
+        return
+      }
+
       this.toggle_fullscreen()
-    })
+    }, {signal})
 
     // On touch there is no hover, so a tap toggles the controls instead
-    this.els.stage.addEventListener(`click`, (e) => {
-      if (e.pointerType !== `touch`) {
+    this.video.addEventListener(`click`, (e) => {
+      if ((e.pointerType !== `touch`) && (this.last_pointer_type !== `touch`)) {
         return
       }
 
@@ -342,7 +507,7 @@ class PerfectPlayer {
         this.clear_hide()
         this.hide_controls()
       }
-    })
+    }, {signal})
   }
 
   // The big seekbar: click, drag, hover preview and sparks
@@ -437,10 +602,17 @@ class PerfectPlayer {
       this.update_fullscreen()
     })
 
-    // A small light ripple on every button press
+    // A small light ripple on every button press, and return focus to the
+    // player root after pointer clicks so Spacebar stays bound to play/pause
     for (let button of this.root.querySelectorAll(`.pvp_button, .pvp_vol_label`)) {
       button.addEventListener(`pointerdown`, (e) => {
         this.ripple(button, e)
+      })
+
+      button.addEventListener(`click`, (e) => {
+        if (e.detail > 0) {
+          this.root.focus({preventScroll: true})
+        }
       })
     }
 
@@ -551,6 +723,10 @@ class PerfectPlayer {
 
     // Wheel anywhere on the volume area changes volume by one step
     this.els.volume.addEventListener(`wheel`, (e) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey) {
+        return
+      }
+
       e.preventDefault()
 
       if (e.deltaY === 0) {
@@ -573,7 +749,11 @@ class PerfectPlayer {
     }
 
     this.root.addEventListener(`keydown`, (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) {
+        return
+      }
+
+      if (e.target.closest(`input, textarea, select, [contenteditable]`)) {
         return
       }
 
@@ -626,6 +806,7 @@ class PerfectPlayer {
 
       if (handled) {
         e.preventDefault()
+        e.stopPropagation()
         this.show_controls()
         this.schedule_hide(this.options.hide_delay_idle)
       }
@@ -824,6 +1005,20 @@ class PerfectPlayer {
     }
   }
 
+  // Debounce localStorage writes so host volume fades don't thrash storage
+  schedule_save_volume = () => {
+    if (!this.options.remember_volume) {
+      return
+    }
+
+    clearTimeout(this.save_volume_timeout)
+
+    this.save_volume_timeout = setTimeout(() => {
+      this.save_volume_timeout = undefined
+      this.save_volume()
+    }, 250)
+  }
+
   save_volume = () => {
     if (!this.options.remember_volume) {
       return
@@ -915,6 +1110,9 @@ class PerfectPlayer {
 
     if (video.videoWidth && video.videoHeight) {
       this.root.style.setProperty(`--pvp_ratio`, `${video.videoWidth} / ${video.videoHeight}`)
+    }
+    else {
+      this.root.style.removeProperty(`--pvp_ratio`)
     }
   }
 
@@ -1033,6 +1231,8 @@ class PerfectPlayer {
       this.els.fullscreen.innerHTML = full ? icons.fullscreen_exit : icons.fullscreen
       this.els.fullscreen.setAttribute(`aria-label`, full ? `Exit fullscreen` : `Fullscreen`)
     }
+
+    this.sync_overlay()
   }
 
   update_seek_hover = (ratio) => {
@@ -1143,14 +1343,32 @@ class PerfectPlayer {
 
   // Remove the player and put the original <video> back in its place
   destroy = () => {
+    this.abort.abort()
     this.clear_hide()
     this.stop_repeat()
+    clearTimeout(this.save_volume_timeout)
     cancelAnimationFrame(this.frame_request)
     cancelAnimationFrame(this.seek_request)
+
+    if (this.resize_observer) {
+      this.resize_observer.disconnect()
+      this.resize_observer = undefined
+    }
+
+    if (this.mutation_observer) {
+      this.mutation_observer.disconnect()
+      this.mutation_observer = undefined
+    }
+
     this.video.classList.remove(`pvp_video`)
     this.video.controls = true
-    this.root.parentNode.insertBefore(this.video, this.root)
+
+    if (this.root.parentNode) {
+      this.root.parentNode.insertBefore(this.video, this.root)
+    }
+
     this.root.remove()
+    PerfectPlayer.map.delete(this.video)
     let index = PerfectPlayer.instances.indexOf(this)
 
     if (index !== -1) {

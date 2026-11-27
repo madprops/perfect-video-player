@@ -93,9 +93,15 @@ ready:
 <video data-perfect-player src="movie.mp4" poster="poster.jpg"></video>
 ```
 
-Any `controls` attribute is removed. A numeric `width` attribute is kept as the
-player width, otherwise the player fills the width of its parent and takes the
-height from the video's aspect ratio.
+Any `controls` attribute is removed. Host CSS, inline styles, classes, margins,
+hide/show toggles, and event listeners on the `<video>` continue to work as-is
+— the controls overlay automatically tracks the `<video>`'s rendered box.
+
+Options can also be set in HTML using `data-pvp-*` attributes:
+
+```html
+<video data-perfect-player data-pvp-volume-step="5" data-pvp-keyboard="false" src="movie.mp4"></video>
+```
 
 ### Manual
 
@@ -104,6 +110,9 @@ let player = PerfectPlayer.upgrade(document.querySelector(`#my_video`), {
   volume_step: 5,
   hide_delay_idle: 2000,
 })
+
+// Calling upgrade() again returns the existing instance; get() looks it up
+let same = PerfectPlayer.get(`#my_video`)
 
 player.play()
 player.pause()

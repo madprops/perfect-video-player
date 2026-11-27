@@ -48,39 +48,80 @@
   display: block;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
-  background: #000;
-  border-radius: 8px;
-  container-type: inline-size;
+  background: transparent;
+  outline: none;
+  pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  font-family: Tahoma, Verdana, "Segoe UI", sans-serif;
-  outline: none;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
-.pvp:focus-visible {
-  box-shadow:
-    0 0 0 2px var(--pvp_accent_mid),
-    0 10px 30px rgba(0, 0, 0, 0.5);
+.pvp.pvp_hidden {
+  display: none !important;
+}
+
+.pvp:focus-visible > .pvp_overlay {
+  box-shadow: inset 0 0 0 2px var(--pvp_accent_mid);
 }
 
 /*
-  The ratio defaults to 16:9 until the metadata arrives, then the script
-  sets --pvp_ratio to the real one. This avoids a tiny 150px tall player
-  while the video is still loading. min-height keeps room for the controls.
+  Default <video> styles use :where() (zero specificity) so any host rules on
+  #video or video override them cleanly, while unstyled <video> elements still
+  get a clean 16:9 box with rounded corners and shadow.
 */
-.pvp_video {
+:where(.pvp_video) {
   display: block;
   width: 100%;
   height: auto;
-  min-height: 190px;
+  min-height: 120px;
   aspect-ratio: var(--pvp_ratio, 16 / 9);
   object-fit: contain;
   background: #000;
+  border-radius: var(--pvp_radius, 8px);
+  box-shadow: var(
+    --pvp_shadow,
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 10px 30px rgba(0, 0, 0, 0.5)
+  );
+}
+
+.pvp > .pvp_video {
+  pointer-events: auto;
+}
+
+/*
+  The overlay tracks the <video>'s exact rendered box (offset, size, radius)
+  so host sizing, max-width percentages, margins, and dynamic resizes all work
+  directly on <video> without touching the player wrapper.
+*/
+.pvp_overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--pvp_radius, 8px);
+  container-type: size;
+  pointer-events: none;
+  font-family: Tahoma, Verdana, "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-align: left;
+}
+
+.pvp_overlay.pvp_overlay_hidden {
+  display: none;
+}
+
+/* Keep control sizing insulated even when the host has no border-box reset */
+.pvp_overlay,
+.pvp_overlay *,
+.pvp_overlay *::before,
+.pvp_overlay *::after {
+  box-sizing: border-box;
 }
 
 /* ----------------------------------------------------------------------
@@ -88,27 +129,50 @@
    ---------------------------------------------------------------------- */
 
 .pvp.pvp_full {
-  width: 100%;
-  height: 100%;
-  border-radius: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #000 !important;
+  pointer-events: auto;
 }
 
-.pvp.pvp_full .pvp_video {
-  height: 100%;
-  object-fit: contain;
+.pvp.pvp_full > .pvp_video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  object-fit: contain !important;
+}
+
+.pvp.pvp_full > .pvp_overlay {
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
 }
 
 /* ----------------------------------------------------------------------
-   Stage (double click to fullscreen), centered flash icon, spinner
+   Stage (centered flash icon and spinner; pointer-events pass through to <video>)
    ---------------------------------------------------------------------- */
 
 .pvp_stage {
   position: absolute;
   inset: 0;
-  cursor: default;
+  pointer-events: none;
 }
 
-.pvp_idle .pvp_stage {
+.pvp_idle > .pvp_video,
+.pvp_idle.pvp_full {
   cursor: none;
 }
 
@@ -634,11 +698,18 @@
   flex: none;
   width: 36px;
   height: 36px;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
   margin: 0;
   border: 1px solid #131b26;
   border-radius: 8px;
   background-clip: padding-box;
+  font-family: inherit;
+  line-height: 1;
+  text-transform: none;
+  appearance: none;
+  -webkit-appearance: none;
   color: var(--pvp_icon);
   background: linear-gradient(
     180deg,
@@ -965,12 +1036,16 @@
 
 .pvp_vol_label {
   min-width: 4.4em;
+  min-height: 0;
   padding: 0.4em 0.5em;
   margin: 0;
   border-radius: 5px;
   font-size: clamp(12px, 1.9cqw, 16px);
   line-height: 1.1;
   text-align: center;
+  text-transform: none;
+  appearance: none;
+  -webkit-appearance: none;
   cursor: pointer;
   outline: none;
   position: relative;
@@ -1026,6 +1101,12 @@
   }
 }
 
+@container (max-width: 480px) {
+  .pvp_panel {
+    grid-template-columns: auto 1fr auto;
+  }
+}
+
 @container (max-width: 420px) {
   .pvp_vol_slider,
   .pvp_fullscreen {
@@ -1046,6 +1127,45 @@
   .pvp_seek_tip {
     padding: 4px 10px;
     font-size: 16px;
+  }
+}
+
+@container (max-width: 340px) {
+  .pvp_rewind_long,
+  .pvp_forward_long {
+    display: none;
+  }
+
+  .pvp_time {
+    font-size: 13px;
+    padding: 0.24em 0.5em;
+  }
+}
+
+@container (max-width: 280px) {
+  .pvp_vol_down,
+  .pvp_vol_up {
+    display: none;
+  }
+}
+
+@container (max-height: 210px) {
+  .pvp_controls {
+    --pvp_seek_gap: 10px;
+  }
+
+  .pvp_seek_actions {
+    bottom: calc(100% + 8px);
+  }
+}
+
+@container (max-height: 165px) {
+  .pvp_seek_actions {
+    display: none;
+  }
+
+  .pvp_seek {
+    padding: 8px 0;
   }
 }
 
