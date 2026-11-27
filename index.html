@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<!--
+  Perfect Video Player - demo page
+  Shows the player with a sample video, a local file loader and a small
+  player to show how the controls scale down.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perfect Video Player</title>
+  <link rel="stylesheet" href="css/main/perfect_player.css">
+  <link rel="stylesheet" href="css/main/demo.css">
+  <script src="js/libs/dom.js"></script>
+  <script src="js/main/perfect_player.js"></script>
+  <script src="js/main/demo.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Perfect Video Player</h1>
+    <p>A big seekbar in the middle, big buttons at the bottom, nothing to misclick.</p>
+  </header>
+
+  <main>
+    <video id="main_video" data-perfect-player preload="metadata"
+      poster="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg"
+      src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"></video>
+
+    <div id="loader">
+      <label class="demo_button">
+        Open local file
+        <input id="file_input" type="file" accept="video/*">
+      </label>
+      <input id="url_input" type="url" placeholder="Or paste a video URL and press Enter">
+    </div>
+
+    <section id="shortcuts">
+      <h2>Keyboard (when the player is focused)</h2>
+      <ul>
+        <li><kbd>Space</kbd> / <kbd>K</kbd> Play / Pause</li>
+        <li><kbd>←</kbd> <kbd>→</kbd> Seek 5 seconds</li>
+        <li><kbd>J</kbd> <kbd>L</kbd> Seek 10 seconds</li>
+        <li><kbd>↑</kbd> <kbd>↓</kbd> Volume ±4%</li>
+        <li><kbd>M</kbd> Mute</li>
+        <li><kbd>F</kbd> Fullscreen</li>
+        <li><kbd>0</kbd>–<kbd>9</kbd> Jump to 0%–90%</li>
+        <li><kbd>Home</kbd> <kbd>End</kbd> Start / End</li>
+      </ul>
+    </section>
+
+    <section id="small">
+      <h2>Small player</h2>
+      <video data-perfect-player preload="metadata" width="400"
+        poster="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg"
+        src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"></video>
+    </section>
+  </main>
+</body>
+</html>
+

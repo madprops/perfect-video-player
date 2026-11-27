@@ -1,0 +1,31 @@
+I want you to make "the perfect video player". This is mostly going to be a prototype of how I think web video players should be.
+
+It will be a web player that replaces <video>.
+
+It will be "perfect" because of the following changes:
+
+One of the main problems with video player interfaces is how hard it is to interface with progress/seekbar. Sometimes it is too small, hard to click, hard to click and drag. AND it's too close to buttons below it. That means that wanting to click a button results in accidentally seeking to another position often.
+
+The perfect video player will have a BIG progress bar, easy to click, in the MIDDLE of the video. Why? Because it's hard to click other stuff accidentally. And it won't bother the user since the controls will disappear 1 second after moving the mouse out of the video player, or if the cursor stopped moving for 3 seconds.
+
+It will have a play/pause button on the bottom left, easy to click, big.
+
+It will have a volume control on the bottom right. With BUTTONS. A button on the left to decrease by 4% and a button on the right to increase by 4%. It will have a LABEL that shows the current volume percentage as well as the slider. The slider is also clickable like regular sliders. Wheel works on the volume controls to increase or decrease by 4%.
+
+It will look slick, clean, minimalist, but clean, fresh, modern, metallic, reminiscent of windows 98, windows xp, winamp, fl studio.
+
+In the middle between the bottom buttons there will be the progress and duration. Like 2:36 / 10:00. Big, easy to read.
+
+The bottom buttons and progress label will be inside a panel/bar, with a nice color and transparency. Clicking the background of this panel does nothing.
+
+Clicking the video play/pauses it unless the progress bar was clicked. The progress bar can't be too "huge".
+
+Add some particles or animations or effects to the progress bar and buttons to make it look slick and pleasant to use, but nothing that would drain the battery too much or be annoying.
+
+Consider using dom.js to manage DOM elements.
+
+Document the files properly.
+
+Make a README.md, describing what it is, it's strengths, and how to use it on a website.
+
+Make a license file with gplv3.
