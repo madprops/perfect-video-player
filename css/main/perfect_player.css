@@ -37,12 +37,12 @@
   --pvp_icon: #1b2738;
 
   /* Sizes (scale with the player width through container units) */
-  --pvp_seek_height: clamp(14px, 2.6cqw, 24px);
-  --pvp_panel_height: clamp(52px, 8cqw, 70px);
-  --pvp_main_btn_w: clamp(44px, 6.4cqw, 60px);
-  --pvp_main_btn_h: clamp(36px, 5.4cqw, 46px);
-  --pvp_gap: clamp(6px, 1.4cqw, 12px);
-  --pvp_seek_gap: clamp(16px, 4cqw, 42px);
+  --pvp_seek_height: clamp(12px, 2.1cqw, 20px);
+  --pvp_panel_height: clamp(44px, 6.6cqw, 58px);
+  --pvp_main_btn_w: clamp(38px, 5.4cqw, 50px);
+  --pvp_main_btn_h: clamp(30px, 4.4cqw, 38px);
+  --pvp_gap: clamp(5px, 1.2cqw, 10px);
+  --pvp_seek_gap: clamp(14px, 3.4cqw, 36px);
 
   position: relative;
   display: block;
@@ -181,8 +181,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: clamp(54px, 10cqw, 82px);
-  height: clamp(54px, 10cqw, 82px);
+  width: clamp(46px, 8.5cqw, 70px);
+  height: clamp(46px, 8.5cqw, 70px);
   transform: translate(-50%, -50%) scale(0.8);
   display: flex;
   align-items: center;
@@ -309,7 +309,7 @@
   position: absolute;
   left: clamp(18px, 6cqw, 64px);
   right: clamp(18px, 6cqw, 64px);
-  bottom: calc(100% + clamp(14px, 2.6cqw, 26px));
+  bottom: calc(100% + clamp(10px, 2.1cqw, 22px));
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -320,19 +320,19 @@
 .pvp_skip_group {
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1cqw, 10px);
+  gap: clamp(5px, 0.9cqw, 8px);
   pointer-events: none;
 }
 
 .pvp_button.pvp_skip {
   pointer-events: auto;
   width: auto;
-  height: clamp(32px, 4.6cqw, 40px);
-  padding: 0 clamp(10px, 1.8cqw, 16px);
-  gap: 6px;
-  border-radius: 8px;
+  height: clamp(27px, 3.8cqw, 34px);
+  padding: 0 clamp(8px, 1.4cqw, 13px);
+  gap: 5px;
+  border-radius: 7px;
   font-family: "DejaVu Sans Mono", Consolas, "Courier New", monospace;
-  font-size: clamp(12px, 1.8cqw, 15px);
+  font-size: clamp(11px, 1.5cqw, 13px);
   font-weight: bold;
   letter-spacing: 0.02em;
   color: #edf4ff;
@@ -490,8 +490,8 @@
   position: absolute;
   top: 50%;
   left: 0;
-  width: calc(var(--pvp_seek_height) + 12px);
-  height: calc(var(--pvp_seek_height) + 12px);
+  width: calc(var(--pvp_seek_height) + 10px);
+  height: calc(var(--pvp_seek_height) + 10px);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background:
@@ -527,13 +527,13 @@
 
   position: absolute;
   bottom: calc(100% + 4px);
-  left: clamp(44px, var(--pvp_tip_x), calc(100% - 44px));
+  left: clamp(40px, var(--pvp_tip_x), calc(100% - 40px));
   z-index: 4;
-  padding: 6px 14px;
-  border-radius: 7px;
+  padding: 5px 11px;
+  border-radius: 6px;
   transform: translate(-50%, 5px);
   font-family: "DejaVu Sans Mono", Consolas, "Courier New", monospace;
-  font-size: clamp(18px, 2.9cqw, 26px);
+  font-size: clamp(15px, 2.4cqw, 21px);
   font-weight: bold;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
@@ -668,14 +668,14 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   min-width: 0;
   min-height: 0;
   padding: 0;
   margin: 0;
   border: 1px solid #131b26;
-  border-radius: 8px;
+  border-radius: 7px;
   background-clip: padding-box;
   font-family: inherit;
   line-height: 1;
@@ -746,7 +746,7 @@
   height: var(--pvp_main_btn_h);
   padding: 3px;
   border: none;
-  border-radius: 10px;
+  border-radius: 9px;
   color: #fff;
   background: linear-gradient(
     180deg,
@@ -770,7 +770,7 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  border-radius: 7px;
+  border-radius: 6px;
   overflow: hidden;
   background: linear-gradient(
     180deg,
@@ -869,7 +869,7 @@
 .pvp_button.pvp_fullscreen {
   width: var(--pvp_main_btn_w);
   height: var(--pvp_main_btn_h);
-  border-radius: 10px;
+  border-radius: 9px;
 }
 
 .pvp_button.pvp_fullscreen svg {
@@ -921,10 +921,10 @@
   justify-self: center;
   display: flex;
   align-items: baseline;
-  gap: 0.4em;
-  padding: 0.28em 0.7em;
+  gap: 0.35em;
+  padding: 0.24em 0.6em;
   border-radius: 6px;
-  font-size: clamp(15px, 3cqw, 27px);
+  font-size: clamp(13px, 2.4cqw, 22px);
   line-height: 1.15;
 }
 
@@ -952,9 +952,9 @@
 /* Horizontal margin keeps the thumb clear of the -/+ buttons at 0% and 100% */
 .pvp_vol_slider {
   position: relative;
-  width: clamp(64px, 13cqw, 140px);
-  height: 30px;
-  margin: 0 9px;
+  width: clamp(56px, 11cqw, 120px);
+  height: 26px;
+  margin: 0 7px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -964,7 +964,7 @@
 .pvp_vol_track {
   position: relative;
   width: 100%;
-  height: 9px;
+  height: 8px;
   border-radius: 5px;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(4, 7, 12, 0.85), rgba(26, 34, 48, 0.8));
@@ -988,8 +988,8 @@
   position: absolute;
   top: 50%;
   left: var(--pvp_vol);
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background: radial-gradient(circle at 35% 28%, #ffffff 0%, #e2e7ee 30%, #9aa5b5 70%, #5d6878 100%);
@@ -1007,12 +1007,12 @@
 }
 
 .pvp_vol_label {
-  min-width: 4.4em;
+  min-width: 4.2em;
   min-height: 0;
-  padding: 0.4em 0.5em;
+  padding: 0.34em 0.45em;
   margin: 0;
   border-radius: 5px;
-  font-size: clamp(12px, 1.9cqw, 16px);
+  font-size: clamp(11px, 1.6cqw, 14px);
   line-height: 1.1;
   text-align: center;
   text-transform: none;
@@ -1057,19 +1057,19 @@
 
 @container (max-width: 560px) {
   .pvp_button {
-    width: 30px;
-    height: 30px;
-    border-radius: 7px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
   }
 
   .pvp_button.pvp_skip {
     width: auto;
-    height: 28px;
-    padding: 0 9px;
+    height: 24px;
+    padding: 0 8px;
   }
 
   .pvp_seek {
-    padding: 12px 0;
+    padding: 10px 0;
   }
 }
 
@@ -1086,15 +1086,15 @@
   }
 
   .pvp_button.pvp_skip {
-    height: 26px;
-    padding: 0 7px;
+    height: 22px;
+    padding: 0 6px;
     gap: 4px;
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .pvp_seek_tip {
-    padding: 4px 10px;
-    font-size: 16px;
+    padding: 3px 8px;
+    font-size: 13px;
   }
 }
 
@@ -1105,8 +1105,8 @@
   }
 
   .pvp_time {
-    font-size: 13px;
-    padding: 0.24em 0.5em;
+    font-size: 12px;
+    padding: 0.2em 0.45em;
   }
 }
 

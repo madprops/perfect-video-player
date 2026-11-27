@@ -204,6 +204,7 @@ class PerfectPlayer {
     this.save_volume_timeout = undefined
     this.frame_request = undefined
     this.seek_request = undefined
+    this.fullscreen_check_request = undefined
     this.repeat_timeout = undefined
     this.resize_observer = undefined
     this.mutation_observer = undefined
@@ -216,6 +217,9 @@ class PerfectPlayer {
     this.block_controls_until = 0
     this.was_fullscreen = false
     this.pointer_inside = false
+    this.has_pointer = false
+    this.pointer_x = 0
+    this.pointer_y = 0
     this.over_controls = false
     this.last_pointer_type = ``
     this.last_icon = ``
@@ -838,7 +842,7 @@ class PerfectPlayer {
         this.toggle_mute()
       }
       else if (key === `f`) {
-        show_ui = this.is_fullscreen()
+        show_ui = false
         this.toggle_fullscreen()
       }
       else if (key === `home`) {
@@ -901,18 +905,33 @@ class PerfectPlayer {
       })
     }
 
+    this.root.addEventListener(`pointerdown`, (e) => {
+      if (e.pointerType === `touch`) {
+        return
+      }
+
+      this.pointer_inside = true
+      this.has_pointer = true
+      this.pointer_x = e.clientX
+      this.pointer_y = e.clientY
+    })
+
     this.root.addEventListener(`pointermove`, (e) => {
       // Touch "moves" while tapping, those are handled by the stage click
       if (e.pointerType === `touch`) {
         return
       }
 
+      this.pointer_inside = true
+      this.has_pointer = true
+      this.pointer_x = e.clientX
+      this.pointer_y = e.clientY
+
       // Ignore movement briefly after entering fullscreen
       if (performance.now() < this.block_controls_until) {
         return
       }
 
-      this.pointer_inside = true
       this.over_controls = Boolean(e.target.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
       this.show_controls()
 
@@ -1135,6 +1154,59 @@ class PerfectPlayer {
     this.start_frame_loop()
   }
 
+  // Show controls immediately with no fade transition
+  show_controls_immediately = () => {
+    if (!this.is_idle()) {
+      return
+    }
+
+    this.root.classList.add(`pvp_no_transition`)
+    this.show_controls()
+    void this.root.offsetWidth
+    this.root.classList.remove(`pvp_no_transition`)
+  }
+
+  // Check if the last known mouse position is inside the player's video box
+  is_pointer_over_player = () => {
+    if (!this.pointer_inside) {
+      return false
+    }
+
+    if (!this.has_pointer) {
+      return this.root.matches(`:hover`)
+    }
+
+    let rect = this.video.getBoundingClientRect()
+
+    return (
+      (this.pointer_x >= rect.left) &&
+      (this.pointer_x <= rect.right) &&
+      (this.pointer_y >= rect.top) &&
+      (this.pointer_y <= rect.bottom)
+    )
+  }
+
+  // Reveal controls right away when restoring from fullscreen with pointer inside
+  reveal_on_restore = () => {
+    this.pointer_inside = true
+    this.show_controls_immediately()
+    let over = false
+
+    if (this.has_pointer) {
+      let el = document.elementFromPoint(this.pointer_x, this.pointer_y)
+      over = Boolean(el && this.root.contains(el) && el.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
+    }
+
+    this.over_controls = over
+
+    if (this.over_controls) {
+      this.clear_hide()
+    }
+    else {
+      this.schedule_hide(this.options.hide_delay_idle)
+    }
+  }
+
   hide_controls = (force = false) => {
     // Never hide during a drag or while the cursor rests on controls
     if (!force && (this.dragging_seek || this.dragging_volume || this.over_controls)) {
@@ -1304,6 +1376,7 @@ class PerfectPlayer {
   update_fullscreen = () => {
     let full = this.is_fullscreen()
     let entered = full && !this.was_fullscreen
+    let exited = !full && this.was_fullscreen
     this.was_fullscreen = full
     this.root.classList.toggle(`pvp_full`, full)
 
@@ -1316,8 +1389,32 @@ class PerfectPlayer {
     this.sync_overlay()
 
     if (entered) {
+      cancelAnimationFrame(this.fullscreen_check_request)
+      this.fullscreen_check_request = undefined
       this.block_controls_until = performance.now() + this.options.fullscreen_hide_block
       this.hide_controls_immediately()
+    }
+    else if (exited) {
+      this.block_controls_until = 0
+
+      if (this.is_pointer_over_player()) {
+        this.reveal_on_restore()
+      }
+      else {
+        this.pointer_inside = false
+        this.over_controls = false
+
+        // Fallback once layout/:hover settles in case browser chrome shifted clientY
+        cancelAnimationFrame(this.fullscreen_check_request)
+
+        this.fullscreen_check_request = requestAnimationFrame(() => {
+          this.fullscreen_check_request = undefined
+
+          if (!this.is_fullscreen() && this.root.matches(`:hover`)) {
+            this.reveal_on_restore()
+          }
+        })
+      }
     }
     else if (!full) {
       this.block_controls_until = 0
@@ -1439,6 +1536,7 @@ class PerfectPlayer {
     clearTimeout(this.save_volume_timeout)
     cancelAnimationFrame(this.frame_request)
     cancelAnimationFrame(this.seek_request)
+    cancelAnimationFrame(this.fullscreen_check_request)
 
     if (this.resize_observer) {
       this.resize_observer.disconnect()
