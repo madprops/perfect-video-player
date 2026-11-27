@@ -206,7 +206,6 @@ class PerfectPlayer {
     this.save_volume_timeout = undefined
     this.frame_request = undefined
     this.seek_request = undefined
-    this.fullscreen_check_request = undefined
     this.repeat_timeout = undefined
     this.resize_observer = undefined
     this.mutation_observer = undefined
@@ -219,9 +218,6 @@ class PerfectPlayer {
     this.block_controls_until = 0
     this.was_fullscreen = false
     this.pointer_inside = false
-    this.has_pointer = false
-    this.pointer_x = 0
-    this.pointer_y = 0
     this.over_controls = false
     this.last_pointer_type = ``
     this.last_icon = ``
@@ -898,33 +894,18 @@ class PerfectPlayer {
       })
     }
 
-    this.root.addEventListener(`pointerdown`, (e) => {
-      if (e.pointerType === `touch`) {
-        return
-      }
-
-      this.pointer_inside = true
-      this.has_pointer = true
-      this.pointer_x = e.clientX
-      this.pointer_y = e.clientY
-    })
-
     this.root.addEventListener(`pointermove`, (e) => {
       // Touch "moves" while tapping, those are handled by the stage click
       if (e.pointerType === `touch`) {
         return
       }
 
-      this.pointer_inside = true
-      this.has_pointer = true
-      this.pointer_x = e.clientX
-      this.pointer_y = e.clientY
-
       // Ignore movement briefly after entering fullscreen
       if (performance.now() < this.block_controls_until) {
         return
       }
 
+      this.pointer_inside = true
       this.over_controls = Boolean(e.target.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
       this.show_controls()
 
@@ -1159,38 +1140,10 @@ class PerfectPlayer {
     this.root.classList.remove(`pvp_no_transition`)
   }
 
-  // Check if the last known mouse position is inside the player's video box
-  is_pointer_over_player = () => {
-    if (!this.pointer_inside) {
-      return false
-    }
-
-    if (!this.has_pointer) {
-      return this.root.matches(`:hover`)
-    }
-
-    let rect = this.video.getBoundingClientRect()
-
-    return (
-      (this.pointer_x >= rect.left) &&
-      (this.pointer_x <= rect.right) &&
-      (this.pointer_y >= rect.top) &&
-      (this.pointer_y <= rect.bottom)
-    )
-  }
-
-  // Reveal controls right away when restoring from fullscreen with pointer inside
+  // Always reveal controls right away when restoring from fullscreen
   reveal_on_restore = () => {
-    this.pointer_inside = true
     this.show_controls_immediately()
-    let over = false
-
-    if (this.has_pointer) {
-      let el = document.elementFromPoint(this.pointer_x, this.pointer_y)
-      over = Boolean(el && this.root.contains(el) && el.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
-    }
-
-    this.over_controls = over
+    this.over_controls = Boolean(this.root.querySelector(`.pvp_panel:hover, .pvp_seek:hover, .pvp_skip:hover`))
 
     if (this.over_controls) {
       this.clear_hide()
@@ -1382,32 +1335,12 @@ class PerfectPlayer {
     this.sync_overlay()
 
     if (entered) {
-      cancelAnimationFrame(this.fullscreen_check_request)
-      this.fullscreen_check_request = undefined
       this.block_controls_until = performance.now() + this.options.fullscreen_hide_block
       this.hide_controls_immediately()
     }
     else if (exited) {
       this.block_controls_until = 0
-
-      if (this.is_pointer_over_player()) {
-        this.reveal_on_restore()
-      }
-      else {
-        this.pointer_inside = false
-        this.over_controls = false
-
-        // Fallback once layout/:hover settles in case browser chrome shifted clientY
-        cancelAnimationFrame(this.fullscreen_check_request)
-
-        this.fullscreen_check_request = requestAnimationFrame(() => {
-          this.fullscreen_check_request = undefined
-
-          if (!this.is_fullscreen() && this.root.matches(`:hover`)) {
-            this.reveal_on_restore()
-          }
-        })
-      }
+      this.reveal_on_restore()
     }
     else if (!full) {
       this.block_controls_until = 0
@@ -1529,7 +1462,6 @@ class PerfectPlayer {
     clearTimeout(this.save_volume_timeout)
     cancelAnimationFrame(this.frame_request)
     cancelAnimationFrame(this.seek_request)
-    cancelAnimationFrame(this.fullscreen_check_request)
 
     if (this.resize_observer) {
       this.resize_observer.disconnect()
