@@ -42,6 +42,7 @@
   --pvp_main_btn_w: clamp(44px, 6.4cqw, 60px);
   --pvp_main_btn_h: clamp(36px, 5.4cqw, 46px);
   --pvp_gap: clamp(6px, 1.4cqw, 12px);
+  --pvp_seek_gap: clamp(16px, 4cqw, 42px);
 
   position: relative;
   display: block;
@@ -98,7 +99,7 @@
 }
 
 /* ----------------------------------------------------------------------
-   Stage (double click to fullscreen), top flash icon, spinner
+   Stage (double click to fullscreen), centered flash icon, spinner
    ---------------------------------------------------------------------- */
 
 .pvp_stage {
@@ -111,14 +112,14 @@
   cursor: none;
 }
 
-/* Positioned near the top so the middle seekbar never blocks it */
+/* Centered play/pause feedback icon */
 .pvp_flash {
   position: absolute;
-  top: clamp(14px, 10%, 44px);
+  top: 50%;
   left: 50%;
   width: clamp(54px, 10cqw, 82px);
   height: clamp(54px, 10cqw, 82px);
-  transform: translateX(-50%) scale(0.8);
+  transform: translate(-50%, -50%) scale(0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -150,12 +151,12 @@
 @keyframes pvp_flash {
   from {
     opacity: 0.96;
-    transform: translateX(-50%) scale(0.75);
+    transform: translate(-50%, -50%) scale(0.75);
   }
 
   to {
     opacity: 0;
-    transform: translateX(-50%) scale(1.3);
+    transform: translate(-50%, -50%) scale(1.3);
   }
 }
 
@@ -222,15 +223,14 @@
 }
 
 /* ----------------------------------------------------------------------
-   The big seekbar in the middle (+ rewind/forward buttons above it)
+   The big seekbar above the bottom panel (+ rewind/forward buttons above it)
    ---------------------------------------------------------------------- */
 
 .pvp_seek_zone {
   position: absolute;
   left: 0;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: calc(var(--pvp_panel_height) + var(--pvp_gap) + var(--pvp_seek_gap));
   display: flex;
   padding: 0 clamp(18px, 6cqw, 64px);
 }

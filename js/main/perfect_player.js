@@ -5,8 +5,8 @@
   A drop-in replacement for the native <video> controls.
 
   Design goals:
-  - A BIG seekbar placed in the MIDDLE of the video, far away from the
-    buttons, so trying to press a button never seeks by accident.
+  - A BIG seekbar near the bottom with a generous gap above the panel,
+    so trying to press a button never seeks by accident.
   - A big play/pause button on the bottom left.
   - Volume on the bottom right with -4% / +4% buttons, a clickable slider,
     a percentage label, and mouse wheel support.
@@ -345,7 +345,7 @@ class PerfectPlayer {
     })
   }
 
-  // The big middle seekbar: click, drag, hover preview and sparks
+  // The big seekbar: click, drag, hover preview and sparks
   setup_seekbar = () => {
     let seek = this.els.seek
 

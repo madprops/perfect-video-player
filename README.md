@@ -4,7 +4,7 @@ A prototype of how web video players *should* work. It replaces the native
 `<video>` controls with a layout designed around one idea: **you should never
 seek by accident**.
 
-![layout](https://img.shields.io/badge/seekbar-in%20the%20middle-3cb6ff) ![license](https://img.shields.io/badge/license-GPLv3-72ffa6)
+![layout](https://img.shields.io/badge/seekbar-clear%20of%20buttons-3cb6ff) ![license](https://img.shields.io/badge/license-GPLv3-72ffa6)
 
 ## The problem
 
@@ -17,10 +17,11 @@ some random point of the video.
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                       ( ▶ )                          │  ← play/pause feedback at the top
-│  [« -1m] [« -5s]                    [+5s »] [+1m »]  │  ← quick skip buttons
 │                                                      │
-│   ━━━━━━━━━━━━━━━━━━━●───────────────────────────    │  ← big seekbar, in the middle
+│                       ( ▶ )                          │  ← play/pause feedback in the center
+│                                                      │
+│  [« -1m] [« -5s]                    [+5s »] [+1m »]  │  ← quick skip buttons
+│   ━━━━━━━━━━━━━━━━━━━●───────────────────────────    │  ← big seekbar, clear of the panel
 │                                                      │
 │ ┌──────────────────────────────────────────────────┐ │
 │ │ [ ▶ ] [ ⛶ ]      2:36 / 10:00        [-]━━●[+] 64% │ │  ← panel
@@ -30,9 +31,10 @@ some random point of the video.
 
 ## Strengths
 
-- **Big seekbar in the middle of the video.** Easy to click, easy to drag,
-  with a generous (but not huge) hit area, and far away from every button.
-  Hovering shows a big, easy-to-read LCD timestamp above the bar.
+- **Big seekbar well above the bottom panel.** Easy to click, easy to drag,
+  with a generous (but not huge) hit area and a clear gap separating it from
+  the bottom buttons. Hovering shows a big, easy-to-read LCD timestamp above
+  the bar.
 - **Quick `-1m` / `-5s` and `+5s` / `+1m` buttons** well above the left and
   right ends of the seekbar (`-1m` / `+1m` on the outer edges), so you can jump
   back or forward without aiming on the track.
@@ -48,8 +50,7 @@ some random point of the video.
   middle of the panel.
 - **No accidental pauses or misclicks.** Single-clicking the empty video area
   or the panel background does nothing; double-clicking either toggles
-  fullscreen. Play/pause feedback pops cleanly near the top so the seekbar
-  never blocks it.
+  fullscreen. Play/pause feedback pops cleanly in the center of the video.
 - **Controls get out of the way.** They hide 0.5 seconds after the cursor
   leaves the player, or after 2 seconds without moving over the empty video
   area. They stay visible while the cursor rests on the bottom panel or
