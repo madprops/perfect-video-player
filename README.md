@@ -39,7 +39,7 @@ some random point of the video.
 - **Big play/pause and fullscreen buttons** on the bottom left, matching in
   size, with a machined chrome bezel and glossy aqua core on play/pause.
 - **Volume you can actually control precisely** on the bottom right:
-  - a `-` button and a `+` button (4% steps, hold to repeat),
+  - a `-` button and a `+` button (4% steps, hold to repeat, middle-click for 0% / 100%),
   - a regular clickable/draggable slider,
   - a label with the exact percentage (click it to mute),
   - mouse wheel over the volume area changes it by 4%.
@@ -65,8 +65,7 @@ some random point of the video.
 - **Scales with the player.** Sizes use container query units, so a 400px
   player gets compact controls and a fullscreen one gets big ones.
 - **Keyboard support** when the player is focused (see below).
-- **No dependencies or build step.** Plain JS + CSS, plus the tiny
-  [dom.js](https://github.com/madprops/dom) helper.
+- **No dependencies or build step.** Plain JS + CSS.
 
 ## Usage
 
@@ -74,7 +73,6 @@ Copy these files into your site:
 
 ```
 css/main/perfect_player.css
-js/libs/dom.js
 js/main/perfect_player.js
 ```
 
@@ -82,7 +80,6 @@ Include them:
 
 ```html
 <link rel="stylesheet" href="css/main/perfect_player.css">
-<script src="js/libs/dom.js"></script>
 <script src="js/main/perfect_player.js"></script>
 ```
 
@@ -179,7 +176,6 @@ Every color and size is a CSS custom property on `.pvp`:
 |-------------------------------|----------------------------------------------|
 | `js/main/perfect_player.js`   | The player (`PerfectPlayer` class)           |
 | `css/main/perfect_player.css` | Player styles and theme variables            |
-| `js/libs/dom.js`              | Small DOM helper library used by the player  |
 | `index.html`                  | Demo page                                    |
 | `js/main/demo.js`             | Demo page logic (local file / URL loader)    |
 | `css/main/demo.css`           | Demo page styles                             |

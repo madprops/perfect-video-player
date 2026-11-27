@@ -12,14 +12,14 @@ App.init = () => {
 
 // Swap the source of the main video
 App.load_source = (src) => {
-  let video = DOM.el(`#main_video`)
+  let video = document.querySelector(`#main_video`)
   video.removeAttribute(`poster`)
   video.src = src
   video.play()
 }
 
 App.setup_loader = () => {
-  DOM.ev(`#file_input`, `change`, (e) => {
+  document.querySelector(`#file_input`).addEventListener(`change`, (e) => {
     let file = e.target.files[0]
 
     if (file) {
@@ -27,7 +27,7 @@ App.setup_loader = () => {
     }
   })
 
-  DOM.ev(`#url_input`, `keydown`, (e) => {
+  document.querySelector(`#url_input`).addEventListener(`keydown`, (e) => {
     let url = e.target.value.trim()
 
     if ((e.key === `Enter`) && url) {

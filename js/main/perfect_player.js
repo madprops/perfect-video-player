@@ -17,14 +17,12 @@
     or after 2 seconds without cursor movement over the empty video area
     (never while hovering the panel or seekbar).
 
-  Requires: dom.js (the DOM helper object) loaded before this file.
-
   Usage:
     <video data-perfect-player src="movie.mp4"></video>
     (auto upgraded on DOMContentLoaded)
 
     or manually:
-    let player = PerfectPlayer.upgrade(DOM.el(`#my_video`), {volume_step: 5})
+    let player = PerfectPlayer.upgrade(document.querySelector(`#my_video`), {volume_step: 5})
 
   License: MIT
 */
@@ -81,7 +79,7 @@ class PerfectPlayer {
   static upgrade_all = (query = `video[data-perfect-player]`, options = {}) => {
     let players = []
 
-    for (let video of DOM.els(query)) {
+    for (let video of document.querySelectorAll(query)) {
       if (video.closest(`.pvp`)) {
         continue
       }
@@ -124,7 +122,7 @@ class PerfectPlayer {
   }
 
   constructor(video, options = {}) {
-    this.video = DOM.element(video)
+    this.video = (typeof video === `string`) ? document.querySelector(video) : video
 
     if (!this.video || (this.video.tagName !== `VIDEO`)) {
       throw new Error(`PerfectPlayer: a <video> element is required`)
@@ -162,7 +160,8 @@ class PerfectPlayer {
   // Wrap the <video> in the player container and create all the controls
   build = () => {
     let video = this.video
-    let root = DOM.create(`div`, `pvp`)
+    let root = document.createElement(`div`)
+    root.className = `pvp`
     root.tabIndex = 0
     root.setAttribute(`role`, `region`)
     root.setAttribute(`aria-label`, `Video player`)
@@ -235,12 +234,12 @@ class PerfectPlayer {
             <span class="pvp_duration">0:00</span>
           </div>
           <div class="pvp_volume" title="Volume (wheel, Up/Down)">
-            <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down">${icons.minus}</button>
+            <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
             <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
               <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
               <div class="pvp_vol_thumb"></div>
             </div>
-            <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up">${icons.plus}</button>
+            <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
             <button class="pvp_vol_label" type="button" title="Mute (M)">100%</button>
           </div>
         </div>
@@ -262,7 +261,7 @@ class PerfectPlayer {
     ]
 
     for (let name of names) {
-      this.els[name] = DOM.el(`.pvp_${name}`, root)
+      this.els[name] = root.querySelector(`.pvp_${name}`)
     }
   }
 
@@ -273,58 +272,64 @@ class PerfectPlayer {
     video.removeAttribute(`controls`)
     video.playsInline = true
 
-    DOM.ev(video, `play`, () => {
+    video.addEventListener(`play`, () => {
       this.update_play_state()
       this.start_frame_loop()
     })
 
-    DOM.ev(video, `pause`, () => {
+    video.addEventListener(`pause`, () => {
       this.update_play_state()
       this.set_loading(false)
     })
 
-    DOM.ev(video, `ended`, () => {
+    video.addEventListener(`ended`, () => {
       this.update_play_state()
       this.show_controls()
     })
 
-    DOM.evs(video, [`timeupdate`, `seeked`], () => {
-      this.update_progress()
-    })
+    for (let event of [`timeupdate`, `seeked`]) {
+      video.addEventListener(event, () => {
+        this.update_progress()
+      })
+    }
 
-    DOM.evs(video, [`durationchange`, `loadedmetadata`, `emptied`], () => {
-      this.update_ratio()
-      this.update_all()
-    })
+    for (let event of [`durationchange`, `loadedmetadata`, `emptied`]) {
+      video.addEventListener(event, () => {
+        this.update_ratio()
+        this.update_all()
+      })
+    }
 
-    DOM.ev(video, `progress`, () => {
+    video.addEventListener(`progress`, () => {
       this.update_buffer()
     })
 
-    DOM.ev(video, `volumechange`, () => {
+    video.addEventListener(`volumechange`, () => {
       this.update_volume()
       this.save_volume()
     })
 
-    DOM.ev(video, `waiting`, () => {
+    video.addEventListener(`waiting`, () => {
       this.set_loading(true)
     })
 
-    DOM.evs(video, [`playing`, `canplay`, `seeked`], () => {
-      this.set_loading(false)
-    })
+    for (let event of [`playing`, `canplay`, `seeked`]) {
+      video.addEventListener(event, () => {
+        this.set_loading(false)
+      })
+    }
   }
 
   // Double clicking the video toggles fullscreen. A single click on the
   // video does nothing on purpose: playback is only controlled by the play
   // button (or keyboard), so a stray click can never pause the video.
   setup_stage = () => {
-    DOM.ev(this.els.stage, `dblclick`, () => {
+    this.els.stage.addEventListener(`dblclick`, () => {
       this.toggle_fullscreen()
     })
 
     // On touch there is no hover, so a tap toggles the controls instead
-    DOM.ev(this.els.stage, `click`, (e) => {
+    this.els.stage.addEventListener(`click`, (e) => {
       if (e.pointerType !== `touch`) {
         return
       }
@@ -344,7 +349,7 @@ class PerfectPlayer {
   setup_seekbar = () => {
     let seek = this.els.seek
 
-    DOM.ev(seek, `pointerdown`, (e) => {
+    seek.addEventListener(`pointerdown`, (e) => {
       if ((e.button !== 0) || !this.can_seek()) {
         return
       }
@@ -361,7 +366,7 @@ class PerfectPlayer {
       this.burst(this.drag_ratio, 10)
     })
 
-    DOM.ev(seek, `pointermove`, (e) => {
+    seek.addEventListener(`pointermove`, (e) => {
       let ratio = this.seek_ratio(e)
       this.update_seek_hover(ratio)
 
@@ -386,61 +391,63 @@ class PerfectPlayer {
       this.schedule_hide(this.options.hide_delay_idle)
     }
 
-    DOM.evs(seek, [`pointerup`, `pointercancel`, `lostpointercapture`], end_drag)
+    for (let event of [`pointerup`, `pointercancel`, `lostpointercapture`]) {
+      seek.addEventListener(event, end_drag)
+    }
 
-    DOM.ev(seek, `pointerleave`, () => {
+    seek.addEventListener(`pointerleave`, () => {
       seek.classList.remove(`pvp_hovering`)
     })
 
-    DOM.ev(seek, `pointerenter`, () => {
+    seek.addEventListener(`pointerenter`, () => {
       seek.classList.add(`pvp_hovering`)
     })
 
     // Rewind and forward skip buttons sitting above the seekbar ends
-    DOM.ev(this.els.rewind, `click`, () => {
+    this.els.rewind.addEventListener(`click`, () => {
       this.skip(-this.options.seek_step)
     })
 
-    DOM.ev(this.els.rewind_long, `click`, () => {
+    this.els.rewind_long.addEventListener(`click`, () => {
       this.skip(-this.options.seek_step_long)
     })
 
-    DOM.ev(this.els.forward, `click`, () => {
+    this.els.forward.addEventListener(`click`, () => {
       this.skip(this.options.seek_step)
     })
 
-    DOM.ev(this.els.forward_long, `click`, () => {
+    this.els.forward_long.addEventListener(`click`, () => {
       this.skip(this.options.seek_step_long)
     })
   }
 
   // Bottom panel: play, fullscreen, ripples
   setup_panel = () => {
-    DOM.ev(this.els.play, `click`, () => {
+    this.els.play.addEventListener(`click`, () => {
       this.toggle_play()
     })
 
     if (this.els.fullscreen) {
-      DOM.ev(this.els.fullscreen, `click`, () => {
+      this.els.fullscreen.addEventListener(`click`, () => {
         this.toggle_fullscreen()
       })
     }
 
-    DOM.ev(this.root, `fullscreenchange`, () => {
+    this.root.addEventListener(`fullscreenchange`, () => {
       this.update_fullscreen()
     })
 
     // A small light ripple on every button press
-    for (let button of DOM.els(`.pvp_button, .pvp_vol_label`, this.root)) {
-      DOM.ev(button, `pointerdown`, (e) => {
+    for (let button of this.root.querySelectorAll(`.pvp_button, .pvp_vol_label`)) {
+      button.addEventListener(`pointerdown`, (e) => {
         this.ripple(button, e)
       })
     }
 
     // Single clicks on the panel background do nothing; double-clicking the
     // empty panel background toggles fullscreen (ignoring rapid clicks on buttons).
-    DOM.ev(this.els.panel, `dblclick`, (e) => {
-      if (DOM.parent(e.target, [`button`, `.pvp_vol_slider`])) {
+    this.els.panel.addEventListener(`dblclick`, (e) => {
+      if (e.target.closest(`button, .pvp_vol_slider`)) {
         return
       }
 
@@ -448,12 +455,27 @@ class PerfectPlayer {
     })
   }
 
-  // Volume: -/+ buttons (with hold to repeat), slider, label, wheel
+  // Volume: -/+ buttons (hold to repeat, middle-click for min/max), slider, label, wheel
   setup_volume = () => {
     let step = this.options.volume_step
 
-    let hold = (button, amount) => {
-      DOM.ev(button, `pointerdown`, (e) => {
+    let hold = (button, amount, extreme) => {
+      // Prevent browser autoscroll on middle-click
+      button.addEventListener(`mousedown`, (e) => {
+        if (e.button === 1) {
+          e.preventDefault()
+        }
+      })
+
+      button.addEventListener(`pointerdown`, (e) => {
+        if (e.button === 1) {
+          e.preventDefault()
+          this.stop_repeat()
+          this.set_volume(extreme)
+          this.bump_volume()
+          return
+        }
+
         if (e.button !== 0) {
           return
         }
@@ -472,23 +494,25 @@ class PerfectPlayer {
         repeat(420)
       })
 
-      DOM.evs(button, [`pointerup`, `pointerleave`, `pointercancel`], () => {
-        this.stop_repeat()
-      })
+      for (let event of [`pointerup`, `pointerleave`, `pointercancel`]) {
+        button.addEventListener(event, () => {
+          this.stop_repeat()
+        })
+      }
 
       // Keyboard activation (Enter/Space) produces a click with detail 0
-      DOM.ev(button, `click`, (e) => {
+      button.addEventListener(`click`, (e) => {
         if (e.detail === 0) {
           this.change_volume(amount)
         }
       })
     }
 
-    hold(this.els.vol_down, -step)
-    hold(this.els.vol_up, step)
+    hold(this.els.vol_down, -step, 0)
+    hold(this.els.vol_up, step, 100)
     let slider = this.els.vol_slider
 
-    DOM.ev(slider, `pointerdown`, (e) => {
+    slider.addEventListener(`pointerdown`, (e) => {
       if (e.button !== 0) {
         return
       }
@@ -501,13 +525,13 @@ class PerfectPlayer {
       this.set_volume(this.volume_ratio(e) * 100)
     })
 
-    DOM.ev(slider, `pointermove`, (e) => {
+    slider.addEventListener(`pointermove`, (e) => {
       if (this.dragging_volume) {
         this.set_volume(this.volume_ratio(e) * 100)
       }
     })
 
-    DOM.evs(slider, [`pointerup`, `pointercancel`, `lostpointercapture`], () => {
+    let end_drag = () => {
       if (!this.dragging_volume) {
         return
       }
@@ -515,14 +539,18 @@ class PerfectPlayer {
       this.dragging_volume = false
       this.root.classList.remove(`pvp_vol_dragging`)
       this.schedule_hide(this.options.hide_delay_idle)
-    })
+    }
 
-    DOM.ev(this.els.vol_label, `click`, () => {
+    for (let event of [`pointerup`, `pointercancel`, `lostpointercapture`]) {
+      slider.addEventListener(event, end_drag)
+    }
+
+    this.els.vol_label.addEventListener(`click`, () => {
       this.toggle_mute()
     })
 
     // Wheel anywhere on the volume area changes volume by one step
-    DOM.ev(this.els.volume, `wheel`, (e) => {
+    this.els.volume.addEventListener(`wheel`, (e) => {
       e.preventDefault()
 
       if (e.deltaY === 0) {
@@ -536,7 +564,7 @@ class PerfectPlayer {
   // Shortcuts while the player has focus
   setup_keyboard = () => {
     // Clicking anywhere in the player focuses it so shortcuts work
-    DOM.ev(this.root, `pointerdown`, () => {
+    this.root.addEventListener(`pointerdown`, () => {
       this.root.focus({preventScroll: true})
     })
 
@@ -544,7 +572,7 @@ class PerfectPlayer {
       return
     }
 
-    DOM.ev(this.root, `keydown`, (e) => {
+    this.root.addEventListener(`keydown`, (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) {
         return
       }
@@ -617,7 +645,7 @@ class PerfectPlayer {
     ]
 
     for (let el of control_areas) {
-      DOM.ev(el, `pointerenter`, (e) => {
+      el.addEventListener(`pointerenter`, (e) => {
         if (e.pointerType === `touch`) {
           return
         }
@@ -626,7 +654,7 @@ class PerfectPlayer {
         this.clear_hide()
       })
 
-      DOM.ev(el, `pointerleave`, (e) => {
+      el.addEventListener(`pointerleave`, (e) => {
         if (e.pointerType === `touch`) {
           return
         }
@@ -639,14 +667,14 @@ class PerfectPlayer {
       })
     }
 
-    DOM.ev(this.root, `pointermove`, (e) => {
+    this.root.addEventListener(`pointermove`, (e) => {
       // Touch "moves" while tapping, those are handled by the stage click
       if (e.pointerType === `touch`) {
         return
       }
 
       this.pointer_inside = true
-      this.over_controls = Boolean(DOM.parent(e.target, [`.pvp_panel`, `.pvp_seek`, `.pvp_skip`]))
+      this.over_controls = Boolean(e.target.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
       this.show_controls()
 
       if (this.over_controls) {
@@ -657,7 +685,7 @@ class PerfectPlayer {
       }
     })
 
-    DOM.ev(this.root, `pointerleave`, (e) => {
+    this.root.addEventListener(`pointerleave`, (e) => {
       if (e.pointerType === `touch`) {
         return
       }
@@ -757,13 +785,17 @@ class PerfectPlayer {
     this.update_volume()
   }
 
-  change_volume = (amount) => {
-    this.set_volume(this.get_volume() + amount)
+  bump_volume = () => {
     this.els.vol_label.classList.remove(`pvp_bump`)
 
     // Force a reflow so the bump animation restarts on every change
     void this.els.vol_label.offsetWidth
     this.els.vol_label.classList.add(`pvp_bump`)
+  }
+
+  change_volume = (amount) => {
+    this.set_volume(this.get_volume() + amount)
+    this.bump_volume()
   }
 
   toggle_mute = () => {
@@ -1048,7 +1080,8 @@ class PerfectPlayer {
       return
     }
 
-    let el = DOM.create(`div`, `pvp_spark`)
+    let el = document.createElement(`div`)
+    el.className = `pvp_spark`
     let angle = Math.random() * Math.PI * 2
     let distance = (14 + (Math.random() * 30)) * power
     el.style.left = `${ratio * 100}%`
@@ -1058,7 +1091,7 @@ class PerfectPlayer {
     el.style.animationDuration = `${420 + (Math.random() * 380)}ms`
     this.spark_count += 1
 
-    DOM.ev(el, `animationend`, () => {
+    el.addEventListener(`animationend`, () => {
       el.remove()
       this.spark_count -= 1
     })
@@ -1092,11 +1125,12 @@ class PerfectPlayer {
     }
 
     let rect = button.getBoundingClientRect()
-    let el = DOM.create(`span`, `pvp_ripple`)
+    let el = document.createElement(`span`)
+    el.className = `pvp_ripple`
     el.style.left = `${e.clientX - rect.left}px`
     el.style.top = `${e.clientY - rect.top}px`
 
-    DOM.ev(el, `animationend`, () => {
+    el.addEventListener(`animationend`, () => {
       el.remove()
     })
 
@@ -1127,7 +1161,7 @@ class PerfectPlayer {
 
 // Auto upgrade <video data-perfect-player> elements once the DOM is ready
 if (document.readyState === `loading`) {
-  DOM.ev(document, `DOMContentLoaded`, () => {
+  document.addEventListener(`DOMContentLoaded`, () => {
     PerfectPlayer.upgrade_all()
   })
 }
