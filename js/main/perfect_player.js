@@ -218,6 +218,7 @@ class PerfectPlayer {
     this.block_controls_until = 0
     this.was_fullscreen = false
     this.pointer_inside = false
+    this.ignore_fullscreen_leave = false
     this.over_controls = false
     this.last_pointer_type = ``
     this.last_icon = ``
@@ -877,6 +878,7 @@ class PerfectPlayer {
           return
         }
 
+        this.ignore_fullscreen_leave = false
         this.over_controls = true
         this.clear_hide()
       })
@@ -888,7 +890,7 @@ class PerfectPlayer {
 
         this.over_controls = false
 
-        if (this.pointer_inside) {
+        if (!this.is_idle() && (this.pointer_inside || !this.hide_timeout)) {
           this.schedule_hide(this.options.hide_delay_idle)
         }
       })
@@ -905,6 +907,7 @@ class PerfectPlayer {
         return
       }
 
+      this.ignore_fullscreen_leave = false
       this.pointer_inside = true
       this.over_controls = Boolean(e.target.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
       this.show_controls()
@@ -924,7 +927,22 @@ class PerfectPlayer {
 
       this.pointer_inside = false
       this.over_controls = false
-      this.schedule_hide(this.options.hide_delay_leave)
+
+      // Exiting fullscreen shrinks the player under a stationary cursor,
+      // firing a synthetic pointerleave that shouldn't cut short the restore timer
+      if (this.ignore_fullscreen_leave) {
+        this.ignore_fullscreen_leave = false
+
+        if (!this.is_idle() && !this.hide_timeout) {
+          this.schedule_hide(this.options.hide_delay_idle)
+        }
+
+        return
+      }
+
+      if (!this.is_idle()) {
+        this.schedule_hide(this.options.hide_delay_leave)
+      }
     })
   }
 
@@ -1142,15 +1160,9 @@ class PerfectPlayer {
 
   // Always reveal controls right away when restoring from fullscreen
   reveal_on_restore = () => {
+    this.over_controls = false
     this.show_controls_immediately()
-    this.over_controls = Boolean(this.root.querySelector(`.pvp_panel:hover, .pvp_seek:hover, .pvp_skip:hover`))
-
-    if (this.over_controls) {
-      this.clear_hide()
-    }
-    else {
-      this.schedule_hide(this.options.hide_delay_idle)
-    }
+    this.schedule_hide(this.options.hide_delay_idle)
   }
 
   hide_controls = (force = false) => {
@@ -1163,6 +1175,7 @@ class PerfectPlayer {
       this.over_controls = false
     }
 
+    this.ignore_fullscreen_leave = false
     this.clear_hide()
     this.root.classList.add(`pvp_idle`)
     this.stop_repeat()
@@ -1335,15 +1348,20 @@ class PerfectPlayer {
     this.sync_overlay()
 
     if (entered) {
+      this.ignore_fullscreen_leave = false
+      this.pointer_inside = false
       this.block_controls_until = performance.now() + this.options.fullscreen_hide_block
       this.hide_controls_immediately()
     }
     else if (exited) {
       this.block_controls_until = 0
+      this.pointer_inside = false
+      this.ignore_fullscreen_leave = true
       this.reveal_on_restore()
     }
     else if (!full) {
       this.block_controls_until = 0
+      this.ignore_fullscreen_leave = false
     }
   }
 
