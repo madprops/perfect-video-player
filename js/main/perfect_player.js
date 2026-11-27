@@ -11,11 +11,12 @@
   - Volume on the bottom right with -4% / +4% buttons, a clickable slider,
     a percentage label, and mouse wheel support.
   - A big, readable "current / duration" label in the middle of the panel.
-  - A single click on the video does nothing (no accidental pauses),
+  - A single click on empty video space toggles play/pause,
     a double click toggles fullscreen.
   - Controls hide 0.5 seconds after the cursor leaves the player,
-    or after 2 seconds without cursor movement over the empty video area
-    (never while hovering the panel or seekbar).
+    after 2 seconds without cursor movement over the empty video area
+    (never while hovering the panel or seekbar), or immediately when
+    entering fullscreen (ignoring movement for 0.5 seconds).
 
   Usage:
     <video data-perfect-player src="movie.mp4"></video>
@@ -40,6 +41,10 @@ class PerfectPlayer {
     hide_delay_leave: 500,
     // Hide controls this many ms after the cursor stops moving over empty video
     hide_delay_idle: 2000,
+    // Ignore pointer movement for this many ms after entering fullscreen
+    fullscreen_hide_block: 500,
+    // Single click on empty video space toggles play/pause
+    click_to_play: true,
     // Remember the volume across page loads with localStorage
     remember_volume: true,
     storage_key: `perfect_player_volume`,
@@ -195,6 +200,7 @@ class PerfectPlayer {
     this.els = {}
     this.abort = new AbortController()
     this.hide_timeout = undefined
+    this.click_timeout = undefined
     this.save_volume_timeout = undefined
     this.frame_request = undefined
     this.seek_request = undefined
@@ -206,6 +212,9 @@ class PerfectPlayer {
     this.drag_ratio = 0
     this.last_spark = 0
     this.spark_count = 0
+    this.last_click_toggle = 0
+    this.block_controls_until = 0
+    this.was_fullscreen = false
     this.pointer_inside = false
     this.over_controls = false
     this.last_pointer_type = ``
@@ -442,6 +451,7 @@ class PerfectPlayer {
     for (let event of [`timeupdate`, `seeked`]) {
       video.addEventListener(event, () => {
         this.update_progress()
+        this.update_buffer()
       }, {signal})
     }
 
@@ -453,9 +463,11 @@ class PerfectPlayer {
       }, {signal})
     }
 
-    video.addEventListener(`progress`, () => {
-      this.update_buffer()
-    }, {signal})
+    for (let event of [`progress`, `loadeddata`, `canplay`, `canplaythrough`]) {
+      video.addEventListener(event, () => {
+        this.update_buffer()
+      }, {signal})
+    }
 
     video.addEventListener(`volumechange`, () => {
       this.update_volume()
@@ -473,11 +485,10 @@ class PerfectPlayer {
     }
   }
 
-  // Double clicking the video toggles fullscreen (unless handled by the host).
-  // A single click on the video does nothing on purpose: playback is only
-  // controlled by the play button (or keyboard), so a stray click can never
-  // pause the video. Listeners live on <video> directly so host events and the
-  // native context menu are never blocked.
+  // Clicking empty video space toggles play/pause (mouse/pen) or controls
+  // (touch); double clicking toggles fullscreen (unless handled by the host).
+  // Listeners live on <video> directly so host events and the native context
+  // menu are never blocked.
   setup_stage = () => {
     let signal = this.abort.signal
 
@@ -490,23 +501,60 @@ class PerfectPlayer {
         return
       }
 
+      this.clear_click_toggle()
+
+      // If a slow double-click already fired the single-click toggle, undo it
+      if (this.last_click_toggle && ((performance.now() - this.last_click_toggle) < 400)) {
+        this.last_click_toggle = 0
+
+        if (this.video.paused) {
+          this.play()
+        }
+        else {
+          this.pause()
+        }
+      }
+
       this.toggle_fullscreen()
     }, {signal})
 
-    // On touch there is no hover, so a tap toggles the controls instead
     this.video.addEventListener(`click`, (e) => {
-      if ((e.pointerType !== `touch`) && (this.last_pointer_type !== `touch`)) {
+      if (e.defaultPrevented) {
         return
       }
 
-      if (this.is_idle()) {
-        this.show_controls()
-        this.schedule_hide(this.options.hide_delay_idle)
+      // On touch there is no hover, so a tap toggles the controls instead
+      if ((e.pointerType === `touch`) || (this.last_pointer_type === `touch`)) {
+        if (this.is_idle()) {
+          this.show_controls()
+          this.schedule_hide(this.options.hide_delay_idle)
+        }
+        else {
+          this.clear_hide()
+          this.hide_controls()
+        }
+
+        return
       }
-      else {
-        this.clear_hide()
-        this.hide_controls()
+
+      if (!this.options.click_to_play) {
+        return
       }
+
+      // Second click of a double-click cancels the pending play/pause toggle
+      if (e.detail >= 2) {
+        this.clear_click_toggle()
+        return
+      }
+
+      // Wait briefly so double-clicking to fullscreen doesn't pause/resume playback
+      this.clear_click_toggle()
+
+      this.click_timeout = setTimeout(() => {
+        this.click_timeout = undefined
+        this.last_click_toggle = performance.now()
+        this.toggle_play()
+      }, 200)
     }, {signal})
   }
 
@@ -760,6 +808,7 @@ class PerfectPlayer {
       let key = e.key.toLowerCase()
       let on_button = e.target.tagName === `BUTTON`
       let handled = true
+      let show_ui = true
 
       if ((key === ` `) && !on_button) {
         this.toggle_play()
@@ -789,6 +838,7 @@ class PerfectPlayer {
         this.toggle_mute()
       }
       else if (key === `f`) {
+        show_ui = this.is_fullscreen()
         this.toggle_fullscreen()
       }
       else if (key === `home`) {
@@ -807,8 +857,11 @@ class PerfectPlayer {
       if (handled) {
         e.preventDefault()
         e.stopPropagation()
-        this.show_controls()
-        this.schedule_hide(this.options.hide_delay_idle)
+
+        if (show_ui) {
+          this.show_controls()
+          this.schedule_hide(this.options.hide_delay_idle)
+        }
       }
     })
   }
@@ -827,7 +880,7 @@ class PerfectPlayer {
 
     for (let el of control_areas) {
       el.addEventListener(`pointerenter`, (e) => {
-        if (e.pointerType === `touch`) {
+        if ((e.pointerType === `touch`) || (performance.now() < this.block_controls_until)) {
           return
         }
 
@@ -851,6 +904,11 @@ class PerfectPlayer {
     this.root.addEventListener(`pointermove`, (e) => {
       // Touch "moves" while tapping, those are handled by the stage click
       if (e.pointerType === `touch`) {
+        return
+      }
+
+      // Ignore movement briefly after entering fullscreen
+      if (performance.now() < this.block_controls_until) {
         return
       }
 
@@ -895,7 +953,14 @@ class PerfectPlayer {
     this.video.pause()
   }
 
+  clear_click_toggle = () => {
+    clearTimeout(this.click_timeout)
+    this.click_timeout = undefined
+  }
+
   toggle_play = () => {
+    this.clear_click_toggle()
+
     if (this.video.paused || this.video.ended) {
       this.play()
       this.flash(`play`)
@@ -1066,17 +1131,31 @@ class PerfectPlayer {
 
     this.root.classList.remove(`pvp_idle`)
     this.update_progress()
+    this.update_buffer()
     this.start_frame_loop()
   }
 
-  hide_controls = () => {
+  hide_controls = (force = false) => {
     // Never hide during a drag or while the cursor rests on controls
-    if (this.dragging_seek || this.dragging_volume || this.over_controls) {
+    if (!force && (this.dragging_seek || this.dragging_volume || this.over_controls)) {
       return
     }
 
+    if (force) {
+      this.over_controls = false
+    }
+
+    this.clear_hide()
     this.root.classList.add(`pvp_idle`)
     this.stop_repeat()
+  }
+
+  // Hide controls immediately with no fade transition
+  hide_controls_immediately = () => {
+    this.root.classList.add(`pvp_no_transition`)
+    this.hide_controls(true)
+    void this.root.offsetWidth
+    this.root.classList.remove(`pvp_no_transition`)
   }
 
   schedule_hide = (delay) => {
@@ -1200,7 +1279,7 @@ class PerfectPlayer {
     // Show the buffered range that contains the playhead
     for (let i = 0; i < video.buffered.length; i++) {
       if (video.buffered.start(i) <= (video.currentTime + 0.5)) {
-        end = video.buffered.end(i)
+        end = Math.max(end, video.buffered.end(i))
       }
     }
 
@@ -1224,6 +1303,8 @@ class PerfectPlayer {
 
   update_fullscreen = () => {
     let full = this.is_fullscreen()
+    let entered = full && !this.was_fullscreen
+    this.was_fullscreen = full
     this.root.classList.toggle(`pvp_full`, full)
 
     if (this.els.fullscreen) {
@@ -1233,6 +1314,14 @@ class PerfectPlayer {
     }
 
     this.sync_overlay()
+
+    if (entered) {
+      this.block_controls_until = performance.now() + this.options.fullscreen_hide_block
+      this.hide_controls_immediately()
+    }
+    else if (!full) {
+      this.block_controls_until = 0
+    }
   }
 
   update_seek_hover = (ratio) => {
@@ -1345,6 +1434,7 @@ class PerfectPlayer {
   destroy = () => {
     this.abort.abort()
     this.clear_hide()
+    this.clear_click_toggle()
     this.stop_repeat()
     clearTimeout(this.save_volume_timeout)
     cancelAnimationFrame(this.frame_request)

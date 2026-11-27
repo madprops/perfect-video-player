@@ -48,13 +48,15 @@ some random point of the video.
   - The volume is remembered between visits.
 - **Big, readable time** (`2:36 / 10:00`) in a green LCD readout in the
   middle of the panel.
-- **No accidental pauses or misclicks.** Single-clicking the empty video area
-  or the panel background does nothing; double-clicking either toggles
-  fullscreen. Play/pause feedback pops cleanly in the center of the video.
+- **Click empty video space to play/pause, double-click for fullscreen.**
+  Single-clicking the empty video area toggles playback (with clean centered
+  feedback); single-clicking the panel background does nothing so a missed
+  button never pauses. Double-clicking either toggles fullscreen.
 - **Controls get out of the way.** They hide 0.5 seconds after the cursor
-  leaves the player, or after 2 seconds without moving over the empty video
-  area. They stay visible while the cursor rests on the bottom panel or
-  seekbar, and never hide in the middle of a drag. The cursor hides too.
+  leaves the player, after 2 seconds without moving over the empty video area,
+  or immediately when entering fullscreen (ignoring movement for 0.5 seconds).
+  They stay visible while the cursor rests on the bottom panel or seekbar, and
+  never hide in the middle of a drag. The cursor hides too.
 - **Looks good.** Glossy metal and glass inspired by Windows 98/XP, Winamp and
   FL Studio, kept clean and minimal.
 - **Pleasant, but cheap, effects.** Sparks fly from the seekbar when you click
@@ -137,18 +139,20 @@ PerfectPlayer.upgrade_all(`.article video`)
 
 ### Options
 
-| Option              | Default                 | Description                                         |
-|---------------------|-------------------------|-----------------------------------------------------|
-| `volume_step`       | `4`                     | Percent per button press, wheel tick or arrow key   |
-| `seek_step`         | `5`                     | Seconds for `-5s`/`+5s` and left/right arrow keys   |
-| `seek_step_long`    | `60`                    | Seconds for the `-1m`/`+1m` buttons                 |
-| `hide_delay_leave`  | `500`                   | ms to hide controls after the cursor leaves         |
-| `hide_delay_idle`   | `2000`                  | ms to hide controls after idle on empty video area  |
-| `remember_volume`   | `true`                  | Save the volume in `localStorage`                   |
-| `storage_key`       | `perfect_player_volume` | `localStorage` key for the volume                   |
-| `fullscreen_button` | `true`                  | Show the small fullscreen button next to play       |
-| `particles`         | `true`                  | Sparks on the seekbar                               |
-| `keyboard`          | `true`                  | Keyboard shortcuts while focused                    |
+| Option                  | Default                 | Description                                             |
+|-------------------------|-------------------------|---------------------------------------------------------|
+| `volume_step`           | `4`                     | Percent per button press, wheel tick or arrow key       |
+| `seek_step`             | `5`                     | Seconds for `-5s`/`+5s` and left/right arrow keys       |
+| `seek_step_long`        | `60`                    | Seconds for the `-1m`/`+1m` buttons                     |
+| `hide_delay_leave`      | `500`                   | ms to hide controls after the cursor leaves             |
+| `hide_delay_idle`       | `2000`                  | ms to hide controls after idle on empty video area      |
+| `fullscreen_hide_block` | `500`                   | ms to ignore pointer movement after entering fullscreen |
+| `click_to_play`         | `true`                  | Single click on empty video space toggles play/pause    |
+| `remember_volume`       | `true`                  | Save the volume in `localStorage`                       |
+| `storage_key`           | `perfect_player_volume` | `localStorage` key for the volume                       |
+| `fullscreen_button`     | `true`                  | Show the small fullscreen button next to play           |
+| `particles`             | `true`                  | Sparks on the seekbar                                   |
+| `keyboard`              | `true`                  | Keyboard shortcuts while focused                        |
 
 Global defaults can be changed through `PerfectPlayer.defaults`.
 

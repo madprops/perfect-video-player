@@ -280,6 +280,11 @@
   opacity: 0;
 }
 
+.pvp_no_transition .pvp_controls,
+.pvp_no_transition .pvp_panel {
+  transition: none;
+}
+
 .pvp_idle .pvp_seek,
 .pvp_idle .pvp_skip,
 .pvp_idle .pvp_panel {
