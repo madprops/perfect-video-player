@@ -4,6 +4,10 @@ A prototype of how web video players *should* work. It replaces the native
 `<video>` controls with a layout designed around one idea: **you should never
 seek by accident**.
 
+![](image.jpg)
+
+---
+
 ![layout](https://img.shields.io/badge/seekbar-clear%20of%20buttons-3cb6ff) ![license](https://img.shields.io/badge/license-GPLv3-72ffa6)
 
 ## The problem
