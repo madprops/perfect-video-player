@@ -657,6 +657,13 @@
   gap: var(--pvp_gap);
 }
 
+.pvp_right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.4cqw, 14px);
+}
+
 /* ----------------------------------------------------------------------
    Buttons (silver, glossy, beveled)
    ---------------------------------------------------------------------- */
@@ -866,15 +873,9 @@
     0 0 18px var(--pvp_glow);
 }
 
-.pvp_button.pvp_fullscreen {
-  width: var(--pvp_main_btn_w);
-  height: var(--pvp_main_btn_h);
-  border-radius: 9px;
-}
-
 .pvp_button.pvp_fullscreen svg {
-  width: auto;
-  height: 54%;
+  width: 62%;
+  height: 62%;
 }
 
 /* Press ripple */
@@ -943,7 +944,6 @@
 .pvp_volume {
   --pvp_vol: 100%;
 
-  justify-self: end;
   display: flex;
   align-items: center;
   gap: clamp(5px, 0.9cqw, 8px);
@@ -1056,6 +1056,10 @@
    ---------------------------------------------------------------------- */
 
 @container (max-width: 560px) {
+  .pvp_panel {
+    grid-template-columns: auto 1fr auto;
+  }
+
   .pvp_button {
     width: 26px;
     height: 26px;
@@ -1074,15 +1078,8 @@
   }
 }
 
-@container (max-width: 480px) {
-  .pvp_panel {
-    grid-template-columns: auto 1fr auto;
-  }
-}
-
 @container (max-width: 420px) {
-  .pvp_vol_slider,
-  .pvp_fullscreen {
+  .pvp_vol_slider {
     display: none;
   }
 

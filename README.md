@@ -24,7 +24,7 @@ some random point of the video.
 │   ━━━━━━━━━━━━━━━━━━━●───────────────────────────    │  ← big seekbar, clear of the panel
 │                                                      │
 ├──────────────────────────────────────────────────────┤
-│ [ ▶ ] [ ⛶ ]      2:36 / 10:00        [-]━━●[+] 64%   │  ← panel
+│ [ ▶ ]           2:36 / 10:00     [-]━━●[+] 64%  [⛶]  │  ← panel
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -37,9 +37,9 @@ some random point of the video.
 - **Quick `-1m` / `-10s` and `+10s` / `+1m` buttons** well above the left and
   right ends of the seekbar (`-1m` / `+1m` on the outer edges), so you can jump
   back or forward without aiming on the track.
-- **Big play/pause and fullscreen buttons** on the bottom left, matching in
-  size, with a machined chrome bezel and glossy aqua core on play/pause.
-- **Volume you can actually control precisely** on the bottom right:
+- **Big play/pause button** on the bottom left, with a machined chrome bezel
+  and glossy aqua core.
+- **Volume and a compact fullscreen button** on the bottom right:
   - a `-` button and a `+` button (5% steps, hold to repeat, middle-click for 0% / 100%),
   - a regular clickable/draggable slider,
   - a label with the exact percentage (click it to mute),
@@ -151,7 +151,7 @@ PerfectPlayer.upgrade_all(`.article video`)
 | `click_to_play`         | `true`                  | Single click on empty video space toggles play/pause    |
 | `remember_volume`       | `true`                  | Save the volume in `localStorage`                       |
 | `storage_key`           | `perfect_player_volume` | `localStorage` key for the volume                       |
-| `fullscreen_button`     | `true`                  | Show the small fullscreen button next to play           |
+| `fullscreen_button`     | `true`                  | Show the compact fullscreen button on the bottom right  |
 | `particles`             | `true`                  | Sparks on the seekbar                                   |
 | `keyboard`              | `true`                  | Keyboard shortcuts while focused                        |
 

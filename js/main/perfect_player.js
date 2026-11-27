@@ -8,8 +8,8 @@
   - A BIG seekbar near the bottom with a generous gap above the panel,
     so trying to press a button never seeks by accident.
   - A big play/pause button on the bottom left.
-  - Volume on the bottom right with -5% / +5% buttons, a clickable slider,
-    a percentage label, and mouse wheel support.
+  - Volume and a compact fullscreen button on the bottom right, with -5% / +5%
+    buttons, a clickable slider, a percentage label, and mouse wheel support.
   - A big, readable "current / duration" label in the middle of the panel.
   - A single click on empty video space toggles play/pause,
     a double click toggles fullscreen.
@@ -50,7 +50,7 @@ class PerfectPlayer {
     // Remember the volume across page loads with localStorage
     remember_volume: true,
     storage_key: `perfect_player_volume`,
-    // Show a small fullscreen button next to play/pause
+    // Show a compact fullscreen button on the bottom right
     fullscreen_button: true,
     // Sparks on the seekbar (automatically off with prefers-reduced-motion)
     particles: true,
@@ -336,21 +336,23 @@ class PerfectPlayer {
               <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">
                 <span class="pvp_play_core"><span class="pvp_play_icon">${icons.play}</span></span>
               </button>
-              ${fs_button}
             </div>
             <div class="pvp_time" aria-live="off">
               <span class="pvp_current">0:00</span>
               <span class="pvp_separator">/</span>
               <span class="pvp_duration">0:00</span>
             </div>
-            <div class="pvp_volume" title="Volume (wheel, Up/Down)">
-              <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
-              <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
-                <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
-                <div class="pvp_vol_thumb"></div>
+            <div class="pvp_right">
+              <div class="pvp_volume" title="Volume (wheel, Up/Down)">
+                <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
+                <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
+                  <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
+                  <div class="pvp_vol_thumb"></div>
+                </div>
+                <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
+                <button class="pvp_vol_label" type="button" title="Mute (M)">100%</button>
               </div>
-              <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
-              <button class="pvp_vol_label" type="button" title="Mute (M)">100%</button>
+              ${fs_button}
             </div>
           </div>
         </div>
