@@ -5,10 +5,9 @@
   A drop-in replacement for the native <video> controls.
 
   Design goals:
-  - A BIG seekbar near the bottom with a generous gap above the panel,
-    so trying to press a button never seeks by accident.
-  - A big play/pause button on the bottom left (with the video filename beside
-    it when there is room).
+  - A full-width seekbar directly above the bottom panel, big and easy to drag.
+  - A big play/pause button on the bottom left, flanked by skip buttons
+    (-1m / -10s / play / +10s / +1m) when there is room.
   - Volume and a compact fullscreen button on the bottom right, with -5% / +5%
     buttons, a clickable slider, a percentage label, and mouse wheel support.
   - A big, readable "current / duration" label in the middle of the panel.
@@ -53,10 +52,6 @@ class PerfectPlayer {
     storage_key: `perfect_player_volume`,
     // Show a compact fullscreen button on the bottom right
     fullscreen_button: true,
-    // Show the video filename beside play/pause when there is room
-    show_title: true,
-    // Custom title text (defaults to the video filename from src)
-    title: ``,
     // Sparks on the seekbar (automatically off with prefers-reduced-motion)
     particles: true,
     // Keyboard shortcuts while the player is focused
@@ -78,7 +73,9 @@ class PerfectPlayer {
     pause: `<svg viewBox="0 0 24 24"><rect x="5.5" y="4" width="4.6" height="16" rx="1.2"/><rect x="13.9" y="4" width="4.6" height="16" rx="1.2"/></svg>`,
     replay: `<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6.5 12 11V8a5 5 0 1 1-5 5H4.5A7.5 7.5 0 1 0 12 5.5z"/></svg>`,
     rewind: `<svg viewBox="0 0 24 24"><path d="M11.6 17.5V6.5a.8.8 0 0 0-1.3-.62l-6.8 5.5a.8.8 0 0 0 0 1.24l6.8 5.5a.8.8 0 0 0 1.3-.62zm9.4 0V6.5a.8.8 0 0 0-1.3-.62l-6.8 5.5a.8.8 0 0 0 0 1.24l6.8 5.5a.8.8 0 0 0 1.3-.62z"/></svg>`,
+    rewind_short: `<svg viewBox="0 0 24 24"><path d="M16.5 17.5V6.5a.8.8 0 0 0-1.3-.62l-7.2 5.5a.8.8 0 0 0 0 1.24l7.2 5.5a.8.8 0 0 0 1.3-.62z"/></svg>`,
     forward: `<svg viewBox="0 0 24 24"><path d="M12.4 6.5v11a.8.8 0 0 0 1.3.62l6.8-5.5a.8.8 0 0 0 0-1.24l-6.8-5.5a.8.8 0 0 0-1.3.62zM3 6.5v11a.8.8 0 0 0 1.3.62l6.8-5.5a.8.8 0 0 0 0-1.24l-6.8-5.5A.8.8 0 0 0 3 6.5z"/></svg>`,
+    forward_short: `<svg viewBox="0 0 24 24"><path d="M7.5 6.5v11a.8.8 0 0 0 1.3.62l7.2-5.5a.8.8 0 0 0 0-1.24l-7.2-5.5a.8.8 0 0 0-1.3.62z"/></svg>`,
     minus: `<svg viewBox="0 0 24 24"><rect x="4" y="10.3" width="16" height="3.4" rx="1.2"/></svg>`,
     plus: `<svg viewBox="0 0 24 24"><rect x="4" y="10.3" width="16" height="3.4" rx="1.2"/><rect x="10.3" y="4" width="3.4" height="16" rx="1.2"/></svg>`,
     fullscreen: `<svg viewBox="0 0 24 24"><path d="M4 9V4h5v2.2H6.2V9zM15 4h5v5h-2.2V6.2H15zM20 15v5h-5v-2.2h2.8V15zM9 20H4v-5h2.2v2.8H9z"/></svg>`,
@@ -188,42 +185,6 @@ class PerfectPlayer {
     }
 
     return `${secs}s`
-  }
-
-  // Extract a readable filename from a URL or path (ignoring blob:/data: URLs)
-  static extract_filename = (src) => {
-    if (!src) {
-      return ``
-    }
-
-    let trimmed = src.trim()
-
-    if (!trimmed || /^(blob|data):/i.test(trimmed)) {
-      return ``
-    }
-
-    let path = trimmed
-
-    try {
-      path = new URL(trimmed, window.location.href).pathname
-    }
-    catch (err) {
-      path = trimmed.split(/[?#]/)[0]
-    }
-
-    let parts = path.split(`/`).filter(Boolean)
-    let name = parts.length ? parts[parts.length - 1] : ``
-
-    if (!name) {
-      return ``
-    }
-
-    try {
-      return decodeURIComponent(name)
-    }
-    catch (err) {
-      return name
-    }
   }
 
   constructor(video, options = {}) {
@@ -339,8 +300,7 @@ class PerfectPlayer {
 
     // The overlay tracks the <video>'s exact rendered box. The stage lets
     // pointer events pass through to <video> so host listeners and the native
-    // context menu keep working; only the seekbar, skip buttons, and panel
-    // capture pointer events.
+    // context menu keep working; only the seekbar and panel capture pointer events.
     root.innerHTML = `
       <div class="pvp_overlay">
         <div class="pvp_stage">
@@ -348,59 +308,56 @@ class PerfectPlayer {
           <div class="pvp_spinner"></div>
         </div>
         <div class="pvp_controls">
-          <div class="pvp_seek_zone">
-            <div class="pvp_seek_actions">
-              <div class="pvp_skip_group">
+          <div class="pvp_dock">
+            <div class="pvp_seek_zone">
+              <div class="pvp_seek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="pvp_seek_bar">
+                  <div class="pvp_seek_track">
+                    <div class="pvp_seek_buffer"></div>
+                    <div class="pvp_seek_hover"></div>
+                    <div class="pvp_seek_fill"></div>
+                  </div>
+                  <div class="pvp_seek_thumb"></div>
+                  <div class="pvp_sparks"></div>
+                </div>
+                <div class="pvp_seek_tip">0:00</div>
+              </div>
+            </div>
+            <div class="pvp_panel">
+              <div class="pvp_left">
                 <button class="pvp_button pvp_skip pvp_rewind_long" type="button" aria-label="Rewind ${long_step}" title="Rewind ${long_step}">
-                  ${icons.rewind}<span>-${long_step}</span>
+                  ${icons.rewind}<span>${long_step}</span>
                 </button>
                 <button class="pvp_button pvp_skip pvp_rewind" type="button" aria-label="Rewind ${step}" title="Rewind ${step} (Left)">
-                  ${icons.rewind}<span>-${step}</span>
+                  ${icons.rewind_short}<span>${step}</span>
                 </button>
-              </div>
-              <div class="pvp_skip_group">
+                <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">
+                  <span class="pvp_play_core"><span class="pvp_play_icon">${icons.play}</span></span>
+                </button>
                 <button class="pvp_button pvp_skip pvp_forward" type="button" aria-label="Forward ${step}" title="Forward ${step} (Right)">
-                  <span>+${step}</span>${icons.forward}
+                  <span>${step}</span>${icons.forward_short}
                 </button>
                 <button class="pvp_button pvp_skip pvp_forward_long" type="button" aria-label="Forward ${long_step}" title="Forward ${long_step}">
-                  <span>+${long_step}</span>${icons.forward}
+                  <span>${long_step}</span>${icons.forward}
                 </button>
               </div>
-            </div>
-            <div class="pvp_seek" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-              <div class="pvp_seek_track">
-                <div class="pvp_seek_buffer"></div>
-                <div class="pvp_seek_hover"></div>
-                <div class="pvp_seek_fill"><div class="pvp_seek_shine"></div></div>
+              <div class="pvp_time" aria-live="off">
+                <span class="pvp_current">0:00</span>
+                <span class="pvp_separator">/</span>
+                <span class="pvp_duration">0:00</span>
               </div>
-              <div class="pvp_seek_thumb"></div>
-              <div class="pvp_seek_tip">0:00</div>
-              <div class="pvp_sparks"></div>
-            </div>
-          </div>
-          <div class="pvp_panel">
-            <div class="pvp_left">
-              <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">
-                <span class="pvp_play_core"><span class="pvp_play_icon">${icons.play}</span></span>
-              </button>
-              <div class="pvp_title"></div>
-            </div>
-            <div class="pvp_time" aria-live="off">
-              <span class="pvp_current">0:00</span>
-              <span class="pvp_separator">/</span>
-              <span class="pvp_duration">0:00</span>
-            </div>
-            <div class="pvp_right">
-              <div class="pvp_volume" title="Volume (wheel, Up/Down)">
-                <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
-                <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
-                  <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
-                  <div class="pvp_vol_thumb"></div>
+              <div class="pvp_right">
+                <div class="pvp_volume" title="Volume (wheel, Up/Down)">
+                  <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
+                  <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
+                    <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
+                    <div class="pvp_vol_thumb"></div>
+                  </div>
+                  <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
+                  <button class="pvp_vol_label" type="button" title="Mute (M)">100</button>
                 </div>
-                <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
-                <button class="pvp_vol_label" type="button" title="Mute (M)">100%</button>
+                ${fs_button}
               </div>
-              ${fs_button}
             </div>
           </div>
         </div>
@@ -417,7 +374,7 @@ class PerfectPlayer {
       `overlay`, `stage`, `flash`, `spinner`, `rewind`, `rewind_long`, `forward`,
       `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
       `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
-      `play_icon`, `title`, `fullscreen`, `current`, `duration`, `volume`, `vol_down`,
+      `play_icon`, `fullscreen`, `current`, `duration`, `volume`, `vol_down`,
       `vol_slider`, `vol_fill`, `vol_thumb`, `vol_up`, `vol_label`,
     ]
 
@@ -441,12 +398,11 @@ class PerfectPlayer {
       this.mutation_observer = new MutationObserver(() => {
         this.sync_visibility()
         this.sync_overlay()
-        this.update_title()
       })
 
       this.mutation_observer.observe(this.video, {
         attributes: true,
-        attributeFilter: [`class`, `style`, `hidden`, `src`, `data-pvp-title`],
+        attributeFilter: [`class`, `style`, `hidden`],
       })
     }
 
@@ -520,10 +476,6 @@ class PerfectPlayer {
       if (this.dragging_seek && this.seek_dirty) {
         this.request_seek()
       }
-    }, {signal})
-
-    video.addEventListener(`loadstart`, () => {
-      this.update_title()
     }, {signal})
 
     for (let event of [`durationchange`, `loadedmetadata`, `emptied`]) {
@@ -704,7 +656,7 @@ class PerfectPlayer {
       seek.classList.add(`pvp_hovering`)
     })
 
-    // Rewind and forward skip buttons sitting above the seekbar ends
+    // Rewind and forward skip buttons flanking the play button
     this.els.rewind.addEventListener(`click`, () => {
       this.skip(-this.options.seek_step)
     })
@@ -974,10 +926,6 @@ class PerfectPlayer {
     let control_areas = [
       this.els.panel,
       this.els.seek,
-      this.els.rewind,
-      this.els.rewind_long,
-      this.els.forward,
-      this.els.forward_long,
     ]
 
     for (let el of control_areas) {
@@ -1017,7 +965,7 @@ class PerfectPlayer {
       cancelAnimationFrame(this.restore_check_request)
       this.restore_check_request = undefined
       this.pointer_inside = true
-      this.over_controls = Boolean(e.target.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
+      this.over_controls = Boolean(e.target.closest(`.pvp_panel, .pvp_seek`))
       this.show_controls()
 
       if (this.over_controls) {
@@ -1309,12 +1257,12 @@ class PerfectPlayer {
 
       if (inside) {
         let el = document.elementFromPoint(pos.x, pos.y)
-        over = Boolean(el && this.root.contains(el) && el.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
+        over = Boolean(el && this.root.contains(el) && el.closest(`.pvp_panel, .pvp_seek`))
       }
     }
     else {
       inside = this.root.matches(`:hover`)
-      over = inside && Boolean(this.root.querySelector(`.pvp_panel:hover, .pvp_seek:hover, .pvp_skip:hover`))
+      over = inside && Boolean(this.root.querySelector(`.pvp_panel:hover, .pvp_seek:hover`))
     }
 
     this.pointer_inside = inside
@@ -1393,39 +1341,10 @@ class PerfectPlayer {
 
   update_all = () => {
     this.update_play_state()
-    this.update_title()
     this.update_progress()
     this.update_buffer()
     this.update_volume()
     this.update_fullscreen()
-  }
-
-  get_title = () => {
-    if (!this.options.show_title) {
-      return ``
-    }
-
-    if (`pvpTitle` in this.video.dataset) {
-      return this.video.dataset.pvpTitle.trim()
-    }
-
-    if (this.options.title) {
-      return String(this.options.title).trim()
-    }
-
-    let source = this.video.querySelector(`source[src]`)
-    let src = this.video.currentSrc || this.video.getAttribute(`src`) || (source ? source.getAttribute(`src`) : ``)
-    return PerfectPlayer.extract_filename(src)
-  }
-
-  update_title = () => {
-    if (!this.els.title) {
-      return
-    }
-
-    let name = this.get_title()
-    this.els.title.textContent = name
-    this.els.title.title = name
   }
 
   // Use the real aspect ratio of the video once it's known
@@ -1498,7 +1417,7 @@ class PerfectPlayer {
     ratio = PerfectPlayer.clamp(ratio, 0, 1)
     let percent = `${(ratio * 100).toFixed(3)}%`
     this.els.seek_fill.style.width = percent
-    this.els.seek_thumb.style.left = percent
+    this.els.seek_thumb.style.setProperty(`--pvp_progress`, percent)
     this.els.seek.setAttribute(`aria-valuenow`, Math.round(ratio * 100))
     let live = video.duration === Infinity
     let seekable = this.can_seek()
@@ -1540,7 +1459,7 @@ class PerfectPlayer {
     this.els.volume.style.setProperty(`--pvp_vol`, `${percent}%`)
 
     this.els.vol_slider.setAttribute(`aria-valuenow`, percent)
-    this.els.vol_label.textContent = this.video.muted ? `MUTE` : `${percent}%`
+    this.els.vol_label.textContent = this.video.muted ? `MUTE` : String(percent)
     this.els.vol_label.setAttribute(`aria-label`, this.video.muted ? `Unmute` : `Mute`)
     this.els.volume.classList.toggle(`pvp_muted`, muted)
     this.els.vol_down.disabled = percent === 0

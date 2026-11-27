@@ -20,30 +20,24 @@ some random point of the video.
 ## The layout
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                                                      │
-│                       ( ▶ )                          │  ← play/pause feedback in the center
-│                                                      │
-│  [« -1m] [« -10s]                  [+10s »] [+1m »]  │  ← quick skip buttons
-│   ━━━━━━━━━━━━━━━━━━━●───────────────────────────    │  ← big seekbar, clear of the panel
-│                                                      │
-├──────────────────────────────────────────────────────┤
-│ [ ▶ ] video.mp4   2:36 / 10:00   [-]━━●[+] 64%  [⛶]  │  ← panel
-└──────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│                          ( ▶ )                              │  ← play/pause feedback in the center
+│                                                             │
+├━━━━━━━━━━━━━━━━━━━●─────────────────────────────────────────┤  ← full-width seekbar directly above the panel
+│ [«1m][‹10s] [▶] [10s›][1m»]   2:36 / 10:00   [-]━●[+]  64 [⛶]│  ← panel
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Strengths
 
-- **Big seekbar well above the bottom panel.** Easy to click, easy to drag,
-  with a generous (but not huge) hit area and a clear gap separating it from
-  the bottom buttons. Hovering shows a big, easy-to-read LCD timestamp above
-  the bar.
-- **Quick `-1m` / `-10s` and `+10s` / `+1m` buttons** well above the left and
-  right ends of the seekbar (`-1m` / `+1m` on the outer edges), so you can jump
-  back or forward without aiming on the track.
-- **Big play/pause button** on the bottom left, with a machined chrome bezel
-  and glossy aqua core, plus the video filename beside it when there is room
-  (cropped with ellipsis if long).
+- **Full-width seekbar directly above the bottom panel.** Big, easy to click
+  and drag across the full width of the player, with a big LCD timestamp above
+  the bar on hover.
+- **Transport cluster on the bottom left:** a big play/pause button with a
+  machined chrome bezel and glossy aqua core, flanked by quick `1m` / `10s`
+  rewind and forward buttons (`« 1m`, `‹ 10s`, `▶`, `10s ›`, `1m »`) when there
+  is room (outer `1m` buttons hide first on narrower players, then `10s`).
 - **Volume and a compact fullscreen button** on the bottom right:
   - a `-` button and a `+` button (5% steps, hold to repeat, middle-click for 0% / 100%),
   - a regular clickable/draggable slider,
@@ -65,11 +59,10 @@ some random point of the video.
 - **Looks good.** Glossy metal and glass inspired by Windows 98/XP, Winamp and
   FL Studio, kept clean and minimal.
 - **Pleasant, but cheap, effects.** Sparks fly from the seekbar when you click
-  or drag it, buttons ripple when pressed, the progress fill has a soft shine
-  while playing, and a big icon pops when toggling playback. Effects only use
-  `transform`/`opacity`, sparks are capped, and the progress animation loop
-  only runs while the video plays *and* the controls are visible. Everything
-  decorative turns off with `prefers-reduced-motion`.
+  or drag it, buttons ripple when pressed, and a big icon pops when toggling
+  playback. Effects only use `transform`/`opacity`, sparks are capped, and the
+  progress animation loop only runs while the video plays *and* the controls
+  are visible. Everything decorative turns off with `prefers-reduced-motion`.
 - **Scales with the player.** Sizes use container query units, so a 400px
   player gets compact controls and a fullscreen one gets big ones.
 - **Keyboard support** when the player is focused (see below).
@@ -157,8 +150,6 @@ PerfectPlayer.upgrade_all(`.article video`)
 | `remember_volume`       | `true`                  | Save the volume in `localStorage`                       |
 | `storage_key`           | `perfect_player_volume` | `localStorage` key for the volume                       |
 | `fullscreen_button`     | `true`                  | Show the compact fullscreen button on the bottom right  |
-| `show_title`            | `true`                  | Show the video filename beside play when there is room  |
-| `title`                 | `""`                    | Custom title text (defaults to the filename from `src`) |
 | `particles`             | `true`                  | Sparks on the seekbar                                   |
 | `keyboard`              | `true`                  | Keyboard shortcuts while focused                        |
 
