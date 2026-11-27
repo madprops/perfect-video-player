@@ -226,7 +226,7 @@
 
 .pvp_spinner {
   position: absolute;
-  top: 22%;
+  top: 50%;
   left: 50%;
   width: 46px;
   height: 46px;
@@ -327,12 +327,12 @@
 .pvp_button.pvp_skip {
   pointer-events: auto;
   width: auto;
-  height: clamp(27px, 3.8cqw, 34px);
-  padding: 0 clamp(8px, 1.4cqw, 13px);
+  height: clamp(29px, 4cqw, 36px);
+  padding: 0 clamp(9px, 1.5cqw, 14px);
   gap: 5px;
   border-radius: 7px;
   font-family: "DejaVu Sans Mono", Consolas, "Courier New", monospace;
-  font-size: clamp(11px, 1.5cqw, 13px);
+  font-size: clamp(12px, 1.65cqw, 14.5px);
   font-weight: bold;
   letter-spacing: 0.02em;
   color: #edf4ff;
@@ -1064,8 +1064,9 @@
 
   .pvp_button.pvp_skip {
     width: auto;
-    height: 24px;
+    height: 26px;
     padding: 0 8px;
+    font-size: 11px;
   }
 
   .pvp_seek {
@@ -1086,10 +1087,10 @@
   }
 
   .pvp_button.pvp_skip {
-    height: 22px;
+    height: 23px;
     padding: 0 6px;
     gap: 4px;
-    font-size: 10px;
+    font-size: 10.5px;
   }
 
   .pvp_seek_tip {

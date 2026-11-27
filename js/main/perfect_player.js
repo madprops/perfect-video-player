@@ -8,7 +8,7 @@
   - A BIG seekbar near the bottom with a generous gap above the panel,
     so trying to press a button never seeks by accident.
   - A big play/pause button on the bottom left.
-  - Volume on the bottom right with -4% / +4% buttons, a clickable slider,
+  - Volume on the bottom right with -5% / +5% buttons, a clickable slider,
     a percentage label, and mouse wheel support.
   - A big, readable "current / duration" label in the middle of the panel.
   - A single click on empty video space toggles play/pause,
@@ -31,10 +31,12 @@
 class PerfectPlayer {
   // Default options, any of these can be overridden per player
   static defaults = {
-    // Volume change in percent for buttons, wheel and arrow keys
-    volume_step: 4,
-    // Seconds to skip with the -5s/+5s buttons and left/right arrow keys
-    seek_step: 5,
+    // Volume change in percent for buttons and arrow keys
+    volume_step: 5,
+    // Volume change in percent for mouse wheel
+    volume_step_wheel: 3,
+    // Seconds to skip with the -10s/+10s buttons and left/right arrow keys
+    seek_step: 10,
     // Seconds to skip with the -1m/+1m buttons
     seek_step_long: 60,
     // Hide controls this many ms after the cursor leaves the player
@@ -667,16 +669,6 @@ class PerfectPlayer {
         }
       })
     }
-
-    // Single clicks on the panel background do nothing; double-clicking the
-    // empty panel background toggles fullscreen (ignoring rapid clicks on buttons).
-    this.els.panel.addEventListener(`dblclick`, (e) => {
-      if (e.target.closest(`button, .pvp_vol_slider`)) {
-        return
-      }
-
-      this.toggle_fullscreen()
-    })
   }
 
   // Volume: -/+ buttons (hold to repeat, middle-click for min/max), slider, label, wheel
@@ -773,7 +765,7 @@ class PerfectPlayer {
       this.toggle_mute()
     })
 
-    // Wheel anywhere on the volume area changes volume by one step
+    // Wheel anywhere on the volume area changes volume by one wheel step
     this.els.volume.addEventListener(`wheel`, (e) => {
       if (e.ctrlKey || e.metaKey || e.shiftKey) {
         return
@@ -785,7 +777,8 @@ class PerfectPlayer {
         return
       }
 
-      this.change_volume(e.deltaY < 0 ? step : -step)
+      let wheel_step = this.options.volume_step_wheel
+      this.change_volume(e.deltaY < 0 ? wheel_step : -wheel_step)
     }, {passive: false})
   }
 

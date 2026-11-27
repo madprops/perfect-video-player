@@ -20,7 +20,7 @@ some random point of the video.
 │                                                      │
 │                       ( ▶ )                          │  ← play/pause feedback in the center
 │                                                      │
-│  [« -1m] [« -5s]                    [+5s »] [+1m »]  │  ← quick skip buttons
+│  [« -1m] [« -10s]                  [+10s »] [+1m »]  │  ← quick skip buttons
 │   ━━━━━━━━━━━━━━━━━━━●───────────────────────────    │  ← big seekbar, clear of the panel
 │                                                      │
 ├──────────────────────────────────────────────────────┤
@@ -34,23 +34,24 @@ some random point of the video.
   with a generous (but not huge) hit area and a clear gap separating it from
   the bottom buttons. Hovering shows a big, easy-to-read LCD timestamp above
   the bar.
-- **Quick `-1m` / `-5s` and `+5s` / `+1m` buttons** well above the left and
+- **Quick `-1m` / `-10s` and `+10s` / `+1m` buttons** well above the left and
   right ends of the seekbar (`-1m` / `+1m` on the outer edges), so you can jump
   back or forward without aiming on the track.
 - **Big play/pause and fullscreen buttons** on the bottom left, matching in
   size, with a machined chrome bezel and glossy aqua core on play/pause.
 - **Volume you can actually control precisely** on the bottom right:
-  - a `-` button and a `+` button (4% steps, hold to repeat, middle-click for 0% / 100%),
+  - a `-` button and a `+` button (5% steps, hold to repeat, middle-click for 0% / 100%),
   - a regular clickable/draggable slider,
   - a label with the exact percentage (click it to mute),
-  - mouse wheel over the volume area changes it by 4%.
+  - mouse wheel over the volume area changes it by 3%.
   - The volume is remembered between visits.
 - **Big, readable time** (`2:36 / 10:00`) in a green LCD readout in the
   middle of the panel.
 - **Click empty video space to play/pause, double-click for fullscreen.**
   Single-clicking the empty video area toggles playback (with clean centered
-  feedback); single-clicking the panel background does nothing so a missed
-  button never pauses. Double-clicking either toggles fullscreen.
+  feedback) and double-clicking it toggles fullscreen. Clicking or
+  double-clicking the panel background does nothing so missed buttons never
+  pause or fullscreen by accident.
 - **Controls get out of the way.** They hide 0.5 seconds after the cursor
   leaves the player, after 2 seconds without moving over the empty video area,
   or immediately when entering fullscreen (ignoring movement for 0.5 seconds).
@@ -140,8 +141,9 @@ PerfectPlayer.upgrade_all(`.article video`)
 
 | Option                  | Default                 | Description                                             |
 |-------------------------|-------------------------|---------------------------------------------------------|
-| `volume_step`           | `4`                     | Percent per button press, wheel tick or arrow key       |
-| `seek_step`             | `5`                     | Seconds for `-5s`/`+5s` and left/right arrow keys       |
+| `volume_step`           | `5`                     | Percent per button press or arrow key                   |
+| `volume_step_wheel`     | `3`                     | Percent per mouse wheel tick                            |
+| `seek_step`             | `10`                    | Seconds for `-10s`/`+10s` and left/right arrow keys     |
 | `seek_step_long`        | `60`                    | Seconds for the `-1m`/`+1m` buttons                     |
 | `hide_delay_leave`      | `500`                   | ms to hide controls after the cursor leaves             |
 | `hide_delay_idle`       | `2000`                  | ms to hide controls after idle on empty video area      |
@@ -160,9 +162,9 @@ Global defaults can be changed through `PerfectPlayer.defaults`.
 | Key                  | Action              |
 |----------------------|---------------------|
 | `Space` / `K`        | Play / Pause        |
-| `←` / `→`            | Seek 5 seconds      |
+| `←` / `→`            | Seek 10 seconds     |
 | `J` / `L`            | Seek 10 seconds     |
-| `↑` / `↓`            | Volume ±4%          |
+| `↑` / `↓`            | Volume ±5%          |
 | `M`                  | Mute                |
 | `F`                  | Fullscreen          |
 | `0`–`9`              | Jump to 0%–90%      |
