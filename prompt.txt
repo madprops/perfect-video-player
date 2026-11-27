@@ -28,4 +28,4 @@ Document the files properly.
 
 Make a README.md, describing what it is, it's strengths, and how to use it on a website.
 
-Make a license file with gplv3.
+Make a license file with MIT.
