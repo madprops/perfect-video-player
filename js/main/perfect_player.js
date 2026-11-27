@@ -202,10 +202,12 @@ class PerfectPlayer {
     this.els = {}
     this.abort = new AbortController()
     this.hide_timeout = undefined
+    this.hide_delay = 0
     this.click_timeout = undefined
     this.save_volume_timeout = undefined
     this.frame_request = undefined
     this.seek_request = undefined
+    this.restore_check_request = undefined
     this.repeat_timeout = undefined
     this.resize_observer = undefined
     this.mutation_observer = undefined
@@ -218,7 +220,12 @@ class PerfectPlayer {
     this.block_controls_until = 0
     this.was_fullscreen = false
     this.pointer_inside = false
-    this.ignore_fullscreen_leave = false
+    this.has_pointer = false
+    this.pointer_screen_x = 0
+    this.pointer_screen_y = 0
+    this.has_viewport_offset = false
+    this.viewport_offset_x = 0
+    this.viewport_offset_y = 0
     this.over_controls = false
     this.last_pointer_type = ``
     this.last_icon = ``
@@ -863,6 +870,29 @@ class PerfectPlayer {
   // Controls appear on movement, hide after leaving the player or sitting
   // idle over the empty video area (never while hovering the controls).
   setup_autohide = () => {
+    let signal = this.abort.signal
+
+    // Track cursor position across the whole document so exiting fullscreen
+    // knows whether the pointer is inside or outside the restored video box
+    let track_pointer = (e) => {
+      if (e.pointerType === `touch`) {
+        return
+      }
+
+      this.has_pointer = true
+      this.pointer_screen_x = e.screenX
+      this.pointer_screen_y = e.screenY
+
+      if (!this.is_fullscreen()) {
+        this.viewport_offset_x = e.screenX - e.clientX
+        this.viewport_offset_y = e.screenY - e.clientY
+        this.has_viewport_offset = true
+      }
+    }
+
+    document.addEventListener(`pointermove`, track_pointer, {signal})
+    document.addEventListener(`pointerdown`, track_pointer, {signal})
+
     let control_areas = [
       this.els.panel,
       this.els.seek,
@@ -878,7 +908,6 @@ class PerfectPlayer {
           return
         }
 
-        this.ignore_fullscreen_leave = false
         this.over_controls = true
         this.clear_hide()
       })
@@ -907,7 +936,8 @@ class PerfectPlayer {
         return
       }
 
-      this.ignore_fullscreen_leave = false
+      cancelAnimationFrame(this.restore_check_request)
+      this.restore_check_request = undefined
       this.pointer_inside = true
       this.over_controls = Boolean(e.target.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
       this.show_controls()
@@ -928,21 +958,12 @@ class PerfectPlayer {
       this.pointer_inside = false
       this.over_controls = false
 
-      // Exiting fullscreen shrinks the player under a stationary cursor,
-      // firing a synthetic pointerleave that shouldn't cut short the restore timer
-      if (this.ignore_fullscreen_leave) {
-        this.ignore_fullscreen_leave = false
-
-        if (!this.is_idle() && !this.hide_timeout) {
-          this.schedule_hide(this.options.hide_delay_idle)
-        }
-
+      // Don't restart if controls are already hidden or already on the quick leave timer
+      if (this.is_idle() || (this.hide_timeout && (this.hide_delay <= this.options.hide_delay_leave))) {
         return
       }
 
-      if (!this.is_idle()) {
-        this.schedule_hide(this.options.hide_delay_leave)
-      }
+      this.schedule_hide(this.options.hide_delay_leave)
     })
   }
 
@@ -1158,11 +1179,81 @@ class PerfectPlayer {
     this.root.classList.remove(`pvp_no_transition`)
   }
 
-  // Always reveal controls right away when restoring from fullscreen
+  // Map the last known screen pointer coordinates back to windowed viewport space
+  get_windowed_pointer = () => {
+    if (!this.has_pointer || !this.has_viewport_offset) {
+      return null
+    }
+
+    return {
+      x: this.pointer_screen_x - this.viewport_offset_x,
+      y: this.pointer_screen_y - this.viewport_offset_y,
+    }
+  }
+
+  // Pick the right hide behavior after exiting fullscreen based on cursor position
+  apply_restore_hide = () => {
+    let pos = this.get_windowed_pointer()
+    let inside = false
+    let over = false
+
+    if (pos) {
+      let rect = this.video.getBoundingClientRect()
+
+      let in_viewport = (
+        (pos.x >= 0) &&
+        (pos.x <= window.innerWidth) &&
+        (pos.y >= 0) &&
+        (pos.y <= window.innerHeight)
+      )
+
+      inside = in_viewport && (
+        (pos.x >= rect.left) &&
+        (pos.x <= rect.right) &&
+        (pos.y >= rect.top) &&
+        (pos.y <= rect.bottom)
+      )
+
+      if (inside) {
+        let el = document.elementFromPoint(pos.x, pos.y)
+        over = Boolean(el && this.root.contains(el) && el.closest(`.pvp_panel, .pvp_seek, .pvp_skip`))
+      }
+    }
+    else {
+      inside = this.root.matches(`:hover`)
+      over = inside && Boolean(this.root.querySelector(`.pvp_panel:hover, .pvp_seek:hover, .pvp_skip:hover`))
+    }
+
+    this.pointer_inside = inside
+    this.over_controls = over
+
+    if (over) {
+      this.clear_hide()
+    }
+    else {
+      let delay = inside ? this.options.hide_delay_idle : this.options.hide_delay_leave
+
+      if (!this.hide_timeout || (this.hide_delay !== delay)) {
+        this.schedule_hide(delay)
+      }
+    }
+  }
+
+  // Reveal controls right away when restoring from fullscreen, using the quick
+  // leave delay if the cursor is already outside the player
   reveal_on_restore = () => {
-    this.over_controls = false
     this.show_controls_immediately()
-    this.schedule_hide(this.options.hide_delay_idle)
+    this.apply_restore_hide()
+    cancelAnimationFrame(this.restore_check_request)
+
+    // Re-check once layout finishes settling after fullscreen exit
+    this.restore_check_request = requestAnimationFrame(() => {
+      this.restore_check_request = undefined
+
+      if (!this.is_fullscreen() && !this.is_idle()) {
+        this.apply_restore_hide()
+      }
+    })
   }
 
   hide_controls = (force = false) => {
@@ -1175,7 +1266,6 @@ class PerfectPlayer {
       this.over_controls = false
     }
 
-    this.ignore_fullscreen_leave = false
     this.clear_hide()
     this.root.classList.add(`pvp_idle`)
     this.stop_repeat()
@@ -1191,6 +1281,7 @@ class PerfectPlayer {
 
   schedule_hide = (delay) => {
     this.clear_hide()
+    this.hide_delay = delay
 
     this.hide_timeout = setTimeout(() => {
       this.hide_controls()
@@ -1200,6 +1291,7 @@ class PerfectPlayer {
   clear_hide = () => {
     clearTimeout(this.hide_timeout)
     this.hide_timeout = undefined
+    this.hide_delay = 0
   }
 
   // ---------------------------------------------------------------------
@@ -1348,20 +1440,18 @@ class PerfectPlayer {
     this.sync_overlay()
 
     if (entered) {
-      this.ignore_fullscreen_leave = false
+      cancelAnimationFrame(this.restore_check_request)
+      this.restore_check_request = undefined
       this.pointer_inside = false
       this.block_controls_until = performance.now() + this.options.fullscreen_hide_block
       this.hide_controls_immediately()
     }
     else if (exited) {
       this.block_controls_until = 0
-      this.pointer_inside = false
-      this.ignore_fullscreen_leave = true
       this.reveal_on_restore()
     }
     else if (!full) {
       this.block_controls_until = 0
-      this.ignore_fullscreen_leave = false
     }
   }
 
@@ -1480,6 +1570,7 @@ class PerfectPlayer {
     clearTimeout(this.save_volume_timeout)
     cancelAnimationFrame(this.frame_request)
     cancelAnimationFrame(this.seek_request)
+    cancelAnimationFrame(this.restore_check_request)
 
     if (this.resize_observer) {
       this.resize_observer.disconnect()
