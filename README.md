@@ -24,7 +24,7 @@ some random point of the video.
 │   ━━━━━━━━━━━━━━━━━━━●───────────────────────────    │  ← big seekbar, clear of the panel
 │                                                      │
 ├──────────────────────────────────────────────────────┤
-│ [ ▶ ]           2:36 / 10:00     [-]━━●[+] 64%  [⛶]  │  ← panel
+│ [ ▶ ] video.mp4   2:36 / 10:00   [-]━━●[+] 64%  [⛶]  │  ← panel
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -38,12 +38,13 @@ some random point of the video.
   right ends of the seekbar (`-1m` / `+1m` on the outer edges), so you can jump
   back or forward without aiming on the track.
 - **Big play/pause button** on the bottom left, with a machined chrome bezel
-  and glossy aqua core.
+  and glossy aqua core, plus the video filename beside it when there is room
+  (cropped with ellipsis if long).
 - **Volume and a compact fullscreen button** on the bottom right:
   - a `-` button and a `+` button (5% steps, hold to repeat, middle-click for 0% / 100%),
   - a regular clickable/draggable slider,
   - a label with the exact percentage (click it to mute),
-  - mouse wheel over the volume area changes it by 3%.
+  - mouse wheel over the volume area changes it by 2%.
   - The volume is remembered between visits.
 - **Big, readable time** (`2:36 / 10:00`) in a green LCD readout in the
   middle of the panel.
@@ -142,7 +143,7 @@ PerfectPlayer.upgrade_all(`.article video`)
 | Option                  | Default                 | Description                                             |
 |-------------------------|-------------------------|---------------------------------------------------------|
 | `volume_step`           | `5`                     | Percent per button press or arrow key                   |
-| `volume_step_wheel`     | `3`                     | Percent per mouse wheel tick                            |
+| `volume_step_wheel`     | `2`                     | Percent per mouse wheel tick                            |
 | `seek_step`             | `10`                    | Seconds for `-10s`/`+10s` and left/right arrow keys     |
 | `seek_step_long`        | `60`                    | Seconds for the `-1m`/`+1m` buttons                     |
 | `hide_delay_leave`      | `500`                   | ms to hide controls after the cursor leaves             |
@@ -152,6 +153,8 @@ PerfectPlayer.upgrade_all(`.article video`)
 | `remember_volume`       | `true`                  | Save the volume in `localStorage`                       |
 | `storage_key`           | `perfect_player_volume` | `localStorage` key for the volume                       |
 | `fullscreen_button`     | `true`                  | Show the compact fullscreen button on the bottom right  |
+| `show_title`            | `true`                  | Show the video filename beside play when there is room  |
+| `title`                 | `""`                    | Custom title text (defaults to the filename from `src`) |
 | `particles`             | `true`                  | Sparks on the seekbar                                   |
 | `keyboard`              | `true`                  | Keyboard shortcuts while focused                        |
 

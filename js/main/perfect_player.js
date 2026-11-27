@@ -7,7 +7,8 @@
   Design goals:
   - A BIG seekbar near the bottom with a generous gap above the panel,
     so trying to press a button never seeks by accident.
-  - A big play/pause button on the bottom left.
+  - A big play/pause button on the bottom left (with the video filename beside
+    it when there is room).
   - Volume and a compact fullscreen button on the bottom right, with -5% / +5%
     buttons, a clickable slider, a percentage label, and mouse wheel support.
   - A big, readable "current / duration" label in the middle of the panel.
@@ -34,7 +35,7 @@ class PerfectPlayer {
     // Volume change in percent for buttons and arrow keys
     volume_step: 5,
     // Volume change in percent for mouse wheel
-    volume_step_wheel: 3,
+    volume_step_wheel: 2,
     // Seconds to skip with the -10s/+10s buttons and left/right arrow keys
     seek_step: 10,
     // Seconds to skip with the -1m/+1m buttons
@@ -52,6 +53,10 @@ class PerfectPlayer {
     storage_key: `perfect_player_volume`,
     // Show a compact fullscreen button on the bottom right
     fullscreen_button: true,
+    // Show the video filename beside play/pause when there is room
+    show_title: true,
+    // Custom title text (defaults to the video filename from src)
+    title: ``,
     // Sparks on the seekbar (automatically off with prefers-reduced-motion)
     particles: true,
     // Keyboard shortcuts while the player is focused
@@ -185,6 +190,42 @@ class PerfectPlayer {
     return `${secs}s`
   }
 
+  // Extract a readable filename from a URL or path (ignoring blob:/data: URLs)
+  static extract_filename = (src) => {
+    if (!src) {
+      return ``
+    }
+
+    let trimmed = src.trim()
+
+    if (!trimmed || /^(blob|data):/i.test(trimmed)) {
+      return ``
+    }
+
+    let path = trimmed
+
+    try {
+      path = new URL(trimmed, window.location.href).pathname
+    }
+    catch (err) {
+      path = trimmed.split(/[?#]/)[0]
+    }
+
+    let parts = path.split(`/`).filter(Boolean)
+    let name = parts.length ? parts[parts.length - 1] : ``
+
+    if (!name) {
+      return ``
+    }
+
+    try {
+      return decodeURIComponent(name)
+    }
+    catch (err) {
+      return name
+    }
+  }
+
   constructor(video, options = {}) {
     this.video = (typeof video === `string`) ? document.querySelector(video) : video
 
@@ -214,6 +255,7 @@ class PerfectPlayer {
     this.dragging_seek = false
     this.dragging_volume = false
     this.drag_ratio = 0
+    this.seek_dirty = false
     this.last_spark = 0
     this.spark_count = 0
     this.last_click_toggle = 0
@@ -243,6 +285,11 @@ class PerfectPlayer {
     this.load_volume()
     this.update_ratio()
     this.update_all()
+
+    if (!this.video.paused && !this.video.ended && !this.is_idle()) {
+      this.start_frame_loop()
+    }
+
     PerfectPlayer.map.set(this.video, this)
     PerfectPlayer.instances.push(this)
   }
@@ -336,6 +383,7 @@ class PerfectPlayer {
               <button class="pvp_button pvp_play" type="button" aria-label="Play" title="Play (Space)">
                 <span class="pvp_play_core"><span class="pvp_play_icon">${icons.play}</span></span>
               </button>
+              <div class="pvp_title"></div>
             </div>
             <div class="pvp_time" aria-live="off">
               <span class="pvp_current">0:00</span>
@@ -369,7 +417,7 @@ class PerfectPlayer {
       `overlay`, `stage`, `flash`, `spinner`, `rewind`, `rewind_long`, `forward`,
       `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
       `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
-      `play_icon`, `fullscreen`, `current`, `duration`, `volume`, `vol_down`,
+      `play_icon`, `title`, `fullscreen`, `current`, `duration`, `volume`, `vol_down`,
       `vol_slider`, `vol_fill`, `vol_thumb`, `vol_up`, `vol_label`,
     ]
 
@@ -393,11 +441,12 @@ class PerfectPlayer {
       this.mutation_observer = new MutationObserver(() => {
         this.sync_visibility()
         this.sync_overlay()
+        this.update_title()
       })
 
       this.mutation_observer.observe(this.video, {
         attributes: true,
-        attributeFilter: [`class`, `style`, `hidden`],
+        attributeFilter: [`class`, `style`, `hidden`, `src`, `data-pvp-title`],
       })
     }
 
@@ -467,6 +516,16 @@ class PerfectPlayer {
       }, {signal})
     }
 
+    video.addEventListener(`seeked`, () => {
+      if (this.dragging_seek && this.seek_dirty) {
+        this.request_seek()
+      }
+    }, {signal})
+
+    video.addEventListener(`loadstart`, () => {
+      this.update_title()
+    }, {signal})
+
     for (let event of [`durationchange`, `loadedmetadata`, `emptied`]) {
       video.addEventListener(event, () => {
         this.update_ratio()
@@ -488,6 +547,10 @@ class PerfectPlayer {
 
     video.addEventListener(`waiting`, () => {
       this.set_loading(true)
+    }, {signal})
+
+    video.addEventListener(`playing`, () => {
+      this.start_frame_loop()
     }, {signal})
 
     for (let event of [`playing`, `canplay`, `seeked`]) {
@@ -585,6 +648,7 @@ class PerfectPlayer {
       this.root.classList.add(`pvp_seeking`)
       this.clear_hide()
       this.drag_ratio = this.seek_ratio(e)
+      this.seek_dirty = true
       this.update_seek_hover(this.drag_ratio)
       this.request_seek()
       this.render_progress(this.drag_ratio)
@@ -599,10 +663,13 @@ class PerfectPlayer {
         return
       }
 
-      this.drag_ratio = ratio
-      this.request_seek()
-      this.render_progress(ratio)
-      this.trail(ratio)
+      if (ratio !== this.drag_ratio) {
+        this.drag_ratio = ratio
+        this.seek_dirty = true
+        this.request_seek()
+        this.render_progress(ratio)
+        this.trail(ratio)
+      }
     })
 
     let end_drag = () => {
@@ -612,7 +679,16 @@ class PerfectPlayer {
 
       this.dragging_seek = false
       this.root.classList.remove(`pvp_seeking`)
-      this.apply_seek()
+      cancelAnimationFrame(this.seek_request)
+      this.seek_request = undefined
+
+      if (this.seek_dirty || (this.drag_ratio >= 1)) {
+        this.apply_seek(true)
+      }
+      else {
+        this.update_progress()
+      }
+
       this.schedule_hide(this.options.hide_delay_idle)
     }
 
@@ -1029,6 +1105,7 @@ class PerfectPlayer {
   }
 
   // Seeking while dragging is throttled to one seek per animation frame
+  // and waits for an in-flight decode instead of flooding the decoder
   request_seek = () => {
     if (this.seek_request) {
       return
@@ -1036,12 +1113,26 @@ class PerfectPlayer {
 
     this.seek_request = requestAnimationFrame(() => {
       this.seek_request = undefined
-      this.apply_seek()
+
+      if (!this.dragging_seek || !this.seek_dirty || this.video.seeking) {
+        return
+      }
+
+      this.apply_seek(false)
     })
   }
 
-  apply_seek = () => {
-    this.seek_to(this.drag_ratio * this.video.duration)
+  apply_seek = (final = true) => {
+    this.seek_dirty = false
+    let duration = this.video.duration
+    let target = this.drag_ratio * duration
+
+    // Avoid triggering "ended" mid-drag if the pointer brushes the right edge
+    if (!final && Number.isFinite(duration) && (duration > 0.1) && (target >= duration)) {
+      target = duration - 0.05
+    }
+
+    this.seek_to(target)
   }
 
   // ---------------------------------------------------------------------
@@ -1302,10 +1393,39 @@ class PerfectPlayer {
 
   update_all = () => {
     this.update_play_state()
+    this.update_title()
     this.update_progress()
     this.update_buffer()
     this.update_volume()
     this.update_fullscreen()
+  }
+
+  get_title = () => {
+    if (!this.options.show_title) {
+      return ``
+    }
+
+    if (`pvpTitle` in this.video.dataset) {
+      return this.video.dataset.pvpTitle.trim()
+    }
+
+    if (this.options.title) {
+      return String(this.options.title).trim()
+    }
+
+    let source = this.video.querySelector(`source[src]`)
+    let src = this.video.currentSrc || this.video.getAttribute(`src`) || (source ? source.getAttribute(`src`) : ``)
+    return PerfectPlayer.extract_filename(src)
+  }
+
+  update_title = () => {
+    if (!this.els.title) {
+      return
+    }
+
+    let name = this.get_title()
+    this.els.title.textContent = name
+    this.els.title.title = name
   }
 
   // Use the real aspect ratio of the video once it's known
@@ -1375,6 +1495,7 @@ class PerfectPlayer {
 
   render_progress = (ratio) => {
     let video = this.video
+    ratio = PerfectPlayer.clamp(ratio, 0, 1)
     let percent = `${(ratio * 100).toFixed(3)}%`
     this.els.seek_fill.style.width = percent
     this.els.seek_thumb.style.left = percent
