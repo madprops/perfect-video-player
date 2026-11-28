@@ -44,8 +44,9 @@ some random point of the video.
   - The volume is remembered between visits.
 - **Two-row VFD display** on the bottom left showing time (`2:36 / 10:00`),
   resolution badge (`1080p` / `4K`), filename, file size (`46.3 MB`), and
-  bitrate (`4.2 Mbps`). Clicking it expands and ticker-scrolls long filenames
-  once (holding controls open up to 5 seconds).
+  bitrate (`4.2 Mbps`). Clicking it opens a media info popup over the video
+  with all available details at a glance (file, resolution, aspect ratio,
+  duration, size, bitrate, format).
 - **Click empty video space to play/pause, double-click for fullscreen.**
   Single-clicking the empty video area toggles playback (with clean centered
   feedback) and double-clicking it toggles fullscreen. Clicking or
@@ -146,7 +147,6 @@ PerfectPlayer.upgrade_all(`.article video`)
 | `hide_delay_leave`      | `500`                   | ms to hide controls after the cursor leaves             |
 | `hide_delay_idle`       | `2000`                  | ms to hide controls after idle on empty video area      |
 | `fullscreen_hide_block` | `500`                   | ms to ignore pointer movement after entering fullscreen |
-| `info_hide_block`       | `5000`                  | Max ms the LCD info ticker holds controls open          |
 | `click_to_play`         | `true`                  | Single click on empty video space toggles play/pause    |
 | `remember_volume`       | `true`                  | Save the volume in `localStorage`                       |
 | `storage_key`           | `perfect_player_volume` | `localStorage` key for the volume                       |

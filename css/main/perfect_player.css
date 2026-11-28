@@ -753,20 +753,6 @@
   filter: drop-shadow(0 1px 2px rgba(0, 16, 48, 0.75)) drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
 }
 
-.pvp_play_icon.pvp_pop {
-  animation: pvp_pop 0.22s cubic-bezier(0.22, 1.4, 0.36, 1);
-}
-
-@keyframes pvp_pop {
-  from {
-    transform: scale(0.72);
-  }
-
-  to {
-    transform: scale(1);
-  }
-}
-
 .pvp_button.pvp_play:hover {
   filter: none;
   box-shadow:
@@ -910,10 +896,13 @@
   pointer-events: none;
 }
 
-.pvp_time:focus-visible {
+.pvp_time:focus-visible,
+.pvp_time.pvp_active {
   box-shadow:
     inset 0 2px 7px rgba(0, 0, 0, 0.92),
-    0 0 0 2px var(--pvp_accent_mid);
+    inset 0 0 0 1px rgba(140, 238, 255, 0.45),
+    0 0 12px rgba(70, 185, 255, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .pvp_time_top {
@@ -999,11 +988,6 @@
   opacity: 0.55;
 }
 
-/* Give a ticker-scrolling filename the full width of the VFD screen */
-.pvp_time.pvp_scrolling .pvp_time_meta {
-  display: none;
-}
-
 .pvp_time_info_text {
   display: block;
   overflow: hidden;
@@ -1014,15 +998,6 @@
   line-height: 1.15;
   color: var(--pvp_lcd_dim);
   text-shadow: 0 0 5px rgba(88, 214, 255, 0.35);
-  will-change: transform;
-}
-
-.pvp_time.pvp_scrolling .pvp_time_info_text {
-  display: inline-block;
-  overflow: visible;
-  text-overflow: clip;
-  color: var(--pvp_lcd_text);
-  text-shadow: 0 0 6px var(--pvp_lcd_glow);
 }
 
 .pvp_separator {
@@ -1031,6 +1006,137 @@
 
 .pvp_duration {
   opacity: 0.8;
+}
+
+/* ----------------------------------------------------------------------
+   Media info popup (centered over the video)
+   ---------------------------------------------------------------------- */
+
+.pvp_info_popup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  width: min(400px, calc(100% - 28px));
+  max-height: calc(100% - var(--pvp_panel_height) - var(--pvp_seek_height) - 24px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(130, 210, 255, 0.32);
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, rgba(6, 13, 24, 0.94), rgba(11, 23, 40, 0.94));
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 14px 36px rgba(0, 0, 0, 0.7),
+    0 0 24px rgba(60, 182, 255, 0.22);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.96);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+
+.pvp_info_popup.pvp_info_open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.pvp_info_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.75);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(148, 174, 212, 0.55) 0%,
+      rgba(64, 86, 122, 0.65) 48%,
+      rgba(22, 32, 50, 0.8) 52%,
+      rgba(36, 52, 78, 0.78) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 0 rgba(140, 220, 255, 0.16);
+}
+
+.pvp_info_title {
+  font-family: "DejaVu Sans Mono", Consolas, "Courier New", monospace;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  color: #e4f4ff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.pvp_button.pvp_info_close {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+}
+
+.pvp_button.pvp_info_close svg {
+  width: 66%;
+  height: 66%;
+}
+
+.pvp_info_body {
+  padding: 10px 14px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: default;
+}
+
+.pvp_info_row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(140, 238, 255, 0.09);
+  font-family: "DejaVu Sans Mono", Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.pvp_info_row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.pvp_info_key {
+  font-size: 10.5px;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pvp_lcd_dim);
+  opacity: 0.85;
+}
+
+.pvp_info_val {
+  color: var(--pvp_lcd_text);
+  text-shadow: 0 0 6px rgba(88, 214, 255, 0.35);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.pvp_info_empty {
+  font-family: "DejaVu Sans Mono", Consolas, "Courier New", monospace;
+  font-size: 12px;
+  color: var(--pvp_lcd_dim);
+  text-align: center;
+  padding: 6px 0;
 }
 
 /* ----------------------------------------------------------------------
@@ -1166,13 +1272,13 @@
     display: none;
   }
 
-  .pvp_flash.pvp_flash_on,
-  .pvp_play_icon.pvp_pop {
+  .pvp_flash.pvp_flash_on {
     animation: none;
   }
 
   .pvp_controls,
-  .pvp_dock {
+  .pvp_dock,
+  .pvp_info_popup {
     transition: none;
   }
 }

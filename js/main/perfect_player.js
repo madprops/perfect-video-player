@@ -6,8 +6,8 @@
 
   Design goals:
   - A full-width seekbar directly above the bottom panel, big and easy to drag.
-  - A two-row VFD display on the bottom left showing time, resolution, and
-    filename (click to ticker-scroll long filenames).
+  - A two-row VFD display on the bottom left showing time, resolution,
+    filename, size, and bitrate (click to open a full media info popup).
   - A big play/pause button in the center, flanked by skip buttons
     (-1m / -10s / play / +10s / +1m) when there is room.
   - Volume and a compact fullscreen button on the bottom right, with -5% / +5%
@@ -46,8 +46,6 @@ class PerfectPlayer {
     hide_delay_idle: 2000,
     // Ignore pointer movement for this many ms after entering fullscreen
     fullscreen_hide_block: 800,
-    // Max ms the LCD info ticker can hold controls open before allowing autohide
-    info_hide_block: 12000,
     // Single click on empty video space toggles play/pause
     click_to_play: true,
     // Remember the volume across page loads with localStorage
@@ -83,6 +81,7 @@ class PerfectPlayer {
     plus: `<svg viewBox="0 0 24 24"><rect x="4" y="10.3" width="16" height="3.4" rx="1.2"/><rect x="10.3" y="4" width="3.4" height="16" rx="1.2"/></svg>`,
     fullscreen: `<svg viewBox="0 0 24 24"><path d="M4 9V4h5v2.2H6.2V9zM15 4h5v5h-2.2V6.2H15zM20 15v5h-5v-2.2h2.8V15zM9 20H4v-5h2.2v2.8H9z"/></svg>`,
     fullscreen_exit: `<svg viewBox="0 0 24 24"><path d="M9 4v5H4V6.8h2.8V4zM20 9h-5V4h2.2v2.8H20zM15 20v-5h5v2.2h-2.8V20zM4 15h5v5H6.8v-2.8H4z"/></svg>`,
+    close: `<svg viewBox="0 0 24 24"><path d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 0 0-1.4 1.4l4.9 4.9-4.9 4.9a1 1 0 1 0 1.4 1.4l4.9-4.9 4.9 4.9a1 1 0 0 0 1.4-1.4L13.4 12l4.9-4.9a1 1 0 0 0 0-1.4z"/></svg>`,
   }
 
   // Return the existing PerfectPlayer instance for a <video> (or selector)
@@ -209,6 +208,31 @@ class PerfectPlayer {
     return `${short_side}p`
   }
 
+  // Format width/height into a clean aspect ratio like "16:9" or "1.78:1"
+  static format_aspect = (width, height) => {
+    if (!width || !height) {
+      return ``
+    }
+
+    let a = Math.round(width)
+    let b = Math.round(height)
+
+    while (b !== 0) {
+      let tmp = b
+      b = a % b
+      a = tmp
+    }
+
+    let rw = Math.round(width) / a
+    let rh = Math.round(height) / a
+
+    if ((rw <= 32) && (rh <= 32)) {
+      return `${rw}:${rh}`
+    }
+
+    return `${(width / height).toFixed(2)}:1`
+  }
+
   // Format a byte count with 1 decimal (KB, MB, or GB)
   static format_size = (bytes) => {
     if (!Number.isFinite(bytes) || (bytes <= 0)) {
@@ -301,11 +325,9 @@ class PerfectPlayer {
     this.hide_delay = 0
     this.click_timeout = undefined
     this.save_volume_timeout = undefined
-    this.info_start_timeout = undefined
-    this.info_end_timeout = undefined
-    this.info_hold_timeout = undefined
-    this.holding_info = false
+    this.info_open = false
     this.file_size = 0
+    this.file_type = ``
     this.size_src = ``
     this.size_abort = undefined
     this.frame_request = undefined
@@ -407,6 +429,13 @@ class PerfectPlayer {
           <div class="pvp_flash"></div>
           <div class="pvp_spinner"></div>
         </div>
+        <div class="pvp_info_popup" role="dialog" aria-label="Media information" aria-hidden="true">
+          <div class="pvp_info_header">
+            <span class="pvp_info_title">MEDIA INFO</span>
+            <button class="pvp_button pvp_info_close" type="button" aria-label="Close" title="Close (Esc)">${icons.close}</button>
+          </div>
+          <div class="pvp_info_body"></div>
+        </div>
         <div class="pvp_controls">
           <div class="pvp_dock">
             <div class="pvp_seek_zone">
@@ -481,12 +510,12 @@ class PerfectPlayer {
     this.root = root
 
     let names = [
-      `overlay`, `stage`, `flash`, `spinner`, `rewind`, `rewind_long`, `forward`,
-      `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
-      `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
-      `play_icon`, `fullscreen`, `time`, `time_info`, `time_info_text`,
-      `resolution`, `file_size`, `bitrate`, `current`, `duration`, `volume`,
-      `vol_down`, `vol_up`, `vol_label`,
+      `overlay`, `stage`, `flash`, `spinner`, `info_popup`, `info_body`,
+      `info_close`, `rewind`, `rewind_long`, `forward`, `forward_long`, `seek`,
+      `seek_track`, `seek_buffer`, `seek_hover`, `seek_fill`, `seek_thumb`,
+      `seek_tip`, `sparks`, `panel`, `play`, `play_icon`, `fullscreen`, `time`,
+      `time_info`, `time_info_text`, `resolution`, `file_size`, `bitrate`,
+      `current`, `duration`, `volume`, `vol_down`, `vol_up`, `vol_label`,
     ]
 
     for (let name of names) {
@@ -595,8 +624,13 @@ class PerfectPlayer {
       video.addEventListener(event, () => {
         this.update_progress()
         this.update_buffer()
+        this.update_play_state()
       }, {signal})
     }
+
+    video.addEventListener(`seeking`, () => {
+      this.update_play_state()
+    }, {signal})
 
     video.addEventListener(`seeked`, () => {
       if (this.dragging_seek && this.seek_dirty) {
@@ -606,9 +640,12 @@ class PerfectPlayer {
 
     for (let event of [`loadstart`, `emptied`]) {
       video.addEventListener(event, () => {
-        this.hide_info(false)
         this.update_filename()
         this.update_file_size()
+
+        if (this.info_open) {
+          this.render_info_popup()
+        }
       }, {signal})
     }
 
@@ -686,6 +723,11 @@ class PerfectPlayer {
 
     this.video.addEventListener(`click`, (e) => {
       if (e.defaultPrevented) {
+        return
+      }
+
+      if (this.info_open) {
+        this.close_info()
         return
       }
 
@@ -826,12 +868,11 @@ class PerfectPlayer {
     }
 
     this.els.time.addEventListener(`click`, () => {
-      if (this.els.time.classList.contains(`pvp_scrolling`)) {
-        this.hide_info()
-        return
-      }
+      this.toggle_info()
+    })
 
-      this.show_filename()
+    this.els.info_close.addEventListener(`click`, () => {
+      this.close_info()
     })
 
     this.root.addEventListener(`fullscreenchange`, () => {
@@ -932,8 +973,11 @@ class PerfectPlayer {
   // Shortcuts while the player has focus
   setup_keyboard = () => {
     // Clicking anywhere in the player focuses it so shortcuts work
-    this.root.addEventListener(`pointerdown`, () => {
-      this.root.focus({preventScroll: true})
+    // (skip inside the info popup so text stays selectable)
+    this.root.addEventListener(`pointerdown`, (e) => {
+      if (!e.target.closest(`.pvp_info_popup`)) {
+        this.root.focus({preventScroll: true})
+      }
     })
 
     if (!this.options.keyboard) {
@@ -984,6 +1028,10 @@ class PerfectPlayer {
       else if (key === `f`) {
         show_ui = false
         this.toggle_fullscreen()
+      }
+      else if ((key === `escape`) && this.info_open && !this.is_fullscreen()) {
+        show_ui = false
+        this.close_info()
       }
       else if (key === `home`) {
         this.seek_to(0)
@@ -1154,6 +1202,7 @@ class PerfectPlayer {
 
     this.video.currentTime = PerfectPlayer.clamp(time, 0, this.video.duration)
     this.update_progress()
+    this.update_play_state()
   }
 
   skip = (secs) => {
@@ -1402,14 +1451,13 @@ class PerfectPlayer {
   }
 
   hide_controls = (force = false) => {
-    // Never hide during a drag, while resting on controls, or while LCD info holds controls open
-    if (!force && (this.dragging_seek || this.over_controls || this.holding_info)) {
+    // Never hide during a drag or while the cursor rests on controls
+    if (!force && (this.dragging_seek || this.over_controls)) {
       return
     }
 
     if (force) {
       this.over_controls = false
-      this.release_info_hold(false)
     }
 
     this.clear_hide()
@@ -1441,7 +1489,7 @@ class PerfectPlayer {
   }
 
   // ---------------------------------------------------------------------
-  // LCD info ticker
+  // Media info popup
   // ---------------------------------------------------------------------
 
   get_source_url = () => {
@@ -1461,114 +1509,107 @@ class PerfectPlayer {
     return PerfectPlayer.extract_filename(this.get_source_url())
   }
 
-  show_filename = () => {
+  get_format = () => {
+    if (this.file_type) {
+      return this.file_type
+    }
+
+    let name = this.get_filename()
+    let match = name.match(/\.([a-z0-9]{2,5})$/i)
+    return match ? match[1].toUpperCase() : ``
+  }
+
+  open_info = () => {
+    this.info_open = true
+    this.render_info_popup()
+    this.els.info_popup.classList.add(`pvp_info_open`)
+    this.els.info_popup.setAttribute(`aria-hidden`, `false`)
+    this.els.time.classList.add(`pvp_active`)
+  }
+
+  close_info = () => {
+    this.info_open = false
+    this.els.info_popup.classList.remove(`pvp_info_open`)
+    this.els.info_popup.setAttribute(`aria-hidden`, `true`)
+    this.els.time.classList.remove(`pvp_active`)
+  }
+
+  toggle_info = () => {
+    if (this.info_open) {
+      this.close_info()
+    }
+    else {
+      this.open_info()
+    }
+  }
+
+  // Populate the info popup with every available piece of media metadata
+  render_info_popup = () => {
+    let body = this.els.info_body
+    body.textContent = ``
+    let video = this.video
+    let rows = []
     let name = this.get_filename()
 
     if (name) {
-      this.show_info(name)
-    }
-  }
-
-  // Temporarily display or ticker-scroll text in the bottom row of the VFD screen
-  show_info = (text) => {
-    let content = String(text || ``).trim()
-
-    if (!content) {
-      return
+      rows.push([`File`, name])
     }
 
-    this.clear_info_timers()
-    let time = this.els.time
-    let info = this.els.time_info
-    let text_el = this.els.time_info_text
-    let is_custom = content !== this.get_filename()
-    let was_truncated = !is_custom && (text_el.scrollWidth > info.clientWidth)
-    text_el.style.transition = ``
-    text_el.style.transform = ``
-    text_el.textContent = content
-    time.classList.add(`pvp_has_info`, `pvp_scrolling`)
-    let overflow = Math.ceil(text_el.scrollWidth - info.clientWidth)
+    if (video.videoWidth && video.videoHeight) {
+      let badge = PerfectPlayer.format_resolution(video.videoWidth, video.videoHeight)
+      rows.push([`Resolution`, `${video.videoWidth} × ${video.videoHeight} (${badge})`])
+      let aspect = PerfectPlayer.format_aspect(video.videoWidth, video.videoHeight)
 
-    if ((overflow <= 0) || this.reduced_motion) {
-      if (!is_custom && !was_truncated) {
-        time.classList.remove(`pvp_scrolling`)
-        return
+      if (aspect) {
+        rows.push([`Aspect`, aspect])
       }
+    }
 
-      this.show_controls()
-      this.clear_hide()
-      this.start_info_hold()
+    if (video.duration === Infinity) {
+      rows.push([`Duration`, `LIVE`])
+    }
+    else if (Number.isFinite(video.duration) && (video.duration > 0)) {
+      rows.push([`Duration`, PerfectPlayer.format_time(video.duration)])
+    }
 
-      this.info_end_timeout = setTimeout(() => {
-        this.info_end_timeout = undefined
-        this.hide_info()
-      }, 2500)
+    let size = PerfectPlayer.format_size(this.file_size)
 
+    if (size) {
+      rows.push([`Size`, size])
+    }
+
+    let bitrate = PerfectPlayer.format_bitrate(this.file_size, video.duration)
+
+    if (bitrate) {
+      rows.push([`Bitrate`, bitrate])
+    }
+
+    let format = this.get_format()
+
+    if (format) {
+      rows.push([`Format`, format])
+    }
+
+    if (!rows.length) {
+      let empty = document.createElement(`div`)
+      empty.className = `pvp_info_empty`
+      empty.textContent = `No media information available`
+      body.append(empty)
       return
     }
 
-    this.show_controls()
-    this.clear_hide()
-    this.start_info_hold()
-    let start_pause = 350
-    let end_pause = 850
-    let scroll_ms = Math.round(Math.max(1000, (overflow / 55) * 1000))
-
-    this.info_start_timeout = setTimeout(() => {
-      this.info_start_timeout = undefined
-      text_el.style.transition = `transform ${scroll_ms}ms linear`
-      text_el.style.transform = `translateX(${-overflow}px)`
-    }, start_pause)
-
-    this.info_end_timeout = setTimeout(() => {
-      this.info_end_timeout = undefined
-      this.hide_info()
-    }, start_pause + scroll_ms + end_pause)
-  }
-
-  // Keep controls visible while LCD info is playing, capped at info_hide_block ms
-  start_info_hold = () => {
-    clearTimeout(this.info_hold_timeout)
-    this.holding_info = true
-
-    this.info_hold_timeout = setTimeout(() => {
-      this.info_hold_timeout = undefined
-      this.release_info_hold()
-    }, this.options.info_hide_block)
-  }
-
-  release_info_hold = (resume_hide = true) => {
-    clearTimeout(this.info_hold_timeout)
-    this.info_hold_timeout = undefined
-
-    if (!this.holding_info) {
-      return
+    for (let [label, value] of rows) {
+      let row = document.createElement(`div`)
+      row.className = `pvp_info_row`
+      let key_el = document.createElement(`span`)
+      key_el.className = `pvp_info_key`
+      key_el.textContent = label
+      let val_el = document.createElement(`span`)
+      val_el.className = `pvp_info_val`
+      val_el.textContent = value
+      row.append(key_el, val_el)
+      body.append(row)
     }
-
-    this.holding_info = false
-
-    if (!resume_hide || this.is_idle() || this.over_controls || this.dragging_seek) {
-      return
-    }
-
-    let stay_open = this.pointer_inside || (this.last_pointer_type === `touch`)
-    this.schedule_hide(stay_open ? this.options.hide_delay_idle : this.options.hide_delay_leave)
-  }
-
-  clear_info_timers = () => {
-    clearTimeout(this.info_start_timeout)
-    clearTimeout(this.info_end_timeout)
-    this.info_start_timeout = undefined
-    this.info_end_timeout = undefined
-  }
-
-  hide_info = (resume_hide = true) => {
-    this.clear_info_timers()
-    this.els.time.classList.remove(`pvp_scrolling`)
-    this.els.time_info_text.style.transition = ``
-    this.els.time_info_text.style.transform = ``
-    this.update_filename()
-    this.release_info_hold(resume_hide)
   }
 
   // ---------------------------------------------------------------------
@@ -1585,6 +1626,10 @@ class PerfectPlayer {
     this.update_buffer()
     this.update_volume()
     this.update_fullscreen()
+
+    if (this.info_open) {
+      this.render_info_popup()
+    }
   }
 
   update_has_info = () => {
@@ -1594,19 +1639,23 @@ class PerfectPlayer {
   }
 
   update_filename = () => {
-    if (this.els.time.classList.contains(`pvp_scrolling`)) {
-      return
-    }
-
     let name = this.get_filename()
     this.els.time_info_text.textContent = name
-    this.els.time.title = name || ``
+    this.els.time.title = name ? `${name} (click for media info)` : `Media info`
     this.update_has_info()
+
+    if (this.info_open) {
+      this.render_info_popup()
+    }
   }
 
   update_resolution = () => {
     let badge = PerfectPlayer.format_resolution(this.video.videoWidth, this.video.videoHeight)
     this.els.resolution.textContent = badge
+
+    if (this.info_open) {
+      this.render_info_popup()
+    }
   }
 
   // Read file size from data-pvp-size or fetch it via HEAD / blob without downloading the video
@@ -1622,6 +1671,7 @@ class PerfectPlayer {
 
         this.size_src = ``
         this.file_size = raw
+        this.file_type = ``
         this.update_meta()
         return
       }
@@ -1637,6 +1687,7 @@ class PerfectPlayer {
 
       this.size_src = ``
       this.file_size = 0
+      this.file_type = ``
       this.update_meta()
       return
     }
@@ -1651,6 +1702,7 @@ class PerfectPlayer {
 
     this.size_src = src
     this.file_size = 0
+    this.file_type = ``
     this.update_meta()
     let controller = new AbortController()
     this.size_abort = controller
@@ -1659,26 +1711,35 @@ class PerfectPlayer {
     let load_size = async () => {
       try {
         let bytes = 0
+        let type = ``
 
         if (/^blob:/i.test(src)) {
           let res = await fetch(src, {signal})
           let blob = await res.blob()
           bytes = blob.size
+          type = blob.type || ``
         }
         else {
           let res = await fetch(src, {method: `HEAD`, signal})
           let len = res.headers.get(`content-length`)
+          let content_type = res.headers.get(`content-type`)
           bytes = len ? Number(len) : 0
+          type = content_type ? content_type.split(`;`)[0].trim() : ``
         }
 
         if (signal.aborted || (this.size_src !== src)) {
           return
         }
 
+        if (type) {
+          this.file_type = type
+        }
+
         if (Number.isFinite(bytes) && (bytes > 0)) {
           this.file_size = bytes
-          this.update_meta()
         }
+
+        this.update_meta()
       }
       catch (err) {
         // Ignore network/CORS/abort errors; size & bitrate simply stay hidden
@@ -1694,6 +1755,10 @@ class PerfectPlayer {
     this.els.file_size.textContent = size
     this.els.bitrate.textContent = bitrate
     this.update_has_info()
+
+    if (this.info_open) {
+      this.render_info_popup()
+    }
   }
 
   // Use the real aspect ratio of the video once it's known
@@ -1710,21 +1775,18 @@ class PerfectPlayer {
 
   update_play_state = () => {
     let video = this.video
-    let playing = !video.paused && !video.ended
+    let ended = video.ended && (!this.can_seek() || (video.currentTime >= (video.duration - 0.05)))
+    let playing = !video.paused && !ended
     let icons = PerfectPlayer.icons
     this.root.classList.toggle(`pvp_playing`, playing)
-    let icon = playing ? `pause` : (video.ended ? `replay` : `play`)
-    let label = playing ? `Pause` : (video.ended ? `Replay` : `Play`)
+    let icon = playing ? `pause` : (ended ? `replay` : `play`)
+    let label = playing ? `Pause` : (ended ? `Replay` : `Play`)
     this.els.play.setAttribute(`aria-label`, label)
     this.els.play.title = `${label} (Space)`
 
-    // Only swap (and animate) the icon when it actually changes
+    // Only swap the icon when it actually changes
     if (icon !== this.last_icon) {
-      let el = this.els.play_icon
-      el.innerHTML = icons[icon]
-      el.classList.remove(`pvp_pop`)
-      void el.offsetWidth
-      el.classList.add(`pvp_pop`)
+      this.els.play_icon.innerHTML = icons[icon]
       this.last_icon = icon
     }
   }
@@ -1969,7 +2031,7 @@ class PerfectPlayer {
 
     this.clear_hide()
     this.clear_click_toggle()
-    this.hide_info(false)
+    this.close_info()
     this.stop_repeat()
     clearTimeout(this.save_volume_timeout)
     cancelAnimationFrame(this.frame_request)
