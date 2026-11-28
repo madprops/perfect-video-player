@@ -44,8 +44,9 @@ some random point of the video.
   - a label with the exact percentage (click it to mute),
   - mouse wheel over the volume area changes it by 2%.
   - The volume is remembered between visits.
-- **Big, readable time** (`2:36 / 10:00`) in a green LCD readout in the
-  middle of the panel.
+- **Big, readable LCD display** (`2:36 / 10:00`) in the middle of the panel.
+  Clicking it temporarily shows the video filename (scrolling once like a
+  ticker if it's wider than the display), then restores the time readout.
 - **Click empty video space to play/pause, double-click for fullscreen.**
   Single-clicking the empty video area toggles playback (with clean centered
   feedback) and double-clicking it toggles fullscreen. Clicking or
@@ -146,6 +147,7 @@ PerfectPlayer.upgrade_all(`.article video`)
 | `hide_delay_leave`      | `500`                   | ms to hide controls after the cursor leaves             |
 | `hide_delay_idle`       | `2000`                  | ms to hide controls after idle on empty video area      |
 | `fullscreen_hide_block` | `500`                   | ms to ignore pointer movement after entering fullscreen |
+| `info_hide_block`       | `5000`                  | Max ms the LCD info ticker holds controls open          |
 | `click_to_play`         | `true`                  | Single click on empty video space toggles play/pause    |
 | `remember_volume`       | `true`                  | Save the volume in `localStorage`                       |
 | `storage_key`           | `perfect_player_volume` | `localStorage` key for the volume                       |

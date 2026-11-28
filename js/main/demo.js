@@ -11,9 +11,17 @@ App.init = () => {
 }
 
 // Swap the source of the main video
-App.load_source = (src) => {
+App.load_source = (src, title = ``) => {
   let video = document.querySelector(`#main_video`)
   video.removeAttribute(`poster`)
+
+  if (title) {
+    video.dataset.pvpTitle = title
+  }
+  else {
+    delete video.dataset.pvpTitle
+  }
+
   video.src = src
   video.play()
 }
@@ -23,7 +31,7 @@ App.setup_loader = () => {
     let file = e.target.files[0]
 
     if (file) {
-      App.load_source(URL.createObjectURL(file))
+      App.load_source(URL.createObjectURL(file), file.name)
     }
   })
 
