@@ -519,6 +519,10 @@ class PerfectPlayer {
       })
     }
 
+    window.addEventListener(`resize`, () => {
+      this.sync_overlay()
+    }, {signal: this.abort.signal})
+
     this.sync_visibility()
     this.sync_overlay()
   }
@@ -529,7 +533,7 @@ class PerfectPlayer {
     this.root.classList.toggle(`pvp_hidden`, hidden)
   }
 
-  // Match .pvp_overlay to the <video>'s exact rendered box inside .pvp
+  // Match .pvp_overlay to the <video>'s exact subpixel rendered box inside .pvp
   sync_overlay = () => {
     let overlay = this.els.overlay
 
@@ -539,20 +543,29 @@ class PerfectPlayer {
     }
 
     let video = this.video
-    let width = video.clientWidth
-    let height = video.clientHeight
+    let video_rect = video.getBoundingClientRect()
+    let root_rect = this.root.getBoundingClientRect()
+    let style = getComputedStyle(video)
+    let border_left = parseFloat(style.borderLeftWidth) || 0
+    let border_right = parseFloat(style.borderRightWidth) || 0
+    let border_top = parseFloat(style.borderTopWidth) || 0
+    let border_bottom = parseFloat(style.borderBottomWidth) || 0
+    let width = video_rect.width - border_left - border_right
+    let height = video_rect.height - border_top - border_bottom
 
-    if ((width === 0) || (height === 0)) {
+    if ((width <= 0) || (height <= 0)) {
       overlay.classList.add(`pvp_overlay_hidden`)
       return
     }
 
+    let left = video_rect.left - root_rect.left + border_left
+    let top = video_rect.top - root_rect.top + border_top
     overlay.classList.remove(`pvp_overlay_hidden`)
-    overlay.style.left = `${video.offsetLeft + video.clientLeft}px`
-    overlay.style.top = `${video.offsetTop + video.clientTop}px`
+    overlay.style.left = `${left}px`
+    overlay.style.top = `${top}px`
     overlay.style.width = `${width}px`
     overlay.style.height = `${height}px`
-    overlay.style.borderRadius = getComputedStyle(video).borderRadius
+    overlay.style.borderRadius = style.borderRadius
   }
 
   // Disable native controls and listen to media events
@@ -825,11 +838,11 @@ class PerfectPlayer {
       this.update_fullscreen()
     })
 
-    // A small light ripple on every button press, and return focus to the
+    // A subtle centered press pulse on every button, and return focus to the
     // player root after pointer clicks so Spacebar stays bound to play/pause
     for (let button of this.root.querySelectorAll(`.pvp_button, .pvp_vol_label, .pvp_time`)) {
-      button.addEventListener(`pointerdown`, (e) => {
-        this.ripple(button, e)
+      button.addEventListener(`pointerdown`, () => {
+        this.ripple(button)
       })
 
       button.addEventListener(`click`, (e) => {
@@ -1918,23 +1931,27 @@ class PerfectPlayer {
     this.spark(ratio, 0.7)
   }
 
-  // Expanding light circle from the press point of a button
-  ripple = (button, e) => {
+  // Centered light pulse across a button when pressed
+  ripple = (button) => {
     if (this.reduced_motion) {
       return
     }
 
-    let rect = button.getBoundingClientRect()
+    let target = button.querySelector(`.pvp_play_core`) || button
+    let old = target.querySelector(`.pvp_ripple`)
+
+    if (old) {
+      old.remove()
+    }
+
     let el = document.createElement(`span`)
     el.className = `pvp_ripple`
-    el.style.left = `${e.clientX - rect.left}px`
-    el.style.top = `${e.clientY - rect.top}px`
 
     el.addEventListener(`animationend`, () => {
       el.remove()
     })
 
-    button.append(el)
+    target.append(el)
   }
 
   // ---------------------------------------------------------------------
