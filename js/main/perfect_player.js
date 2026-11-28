@@ -209,6 +209,42 @@ class PerfectPlayer {
     return `${short_side}p`
   }
 
+  // Format a byte count with 1 decimal (KB, MB, or GB)
+  static format_size = (bytes) => {
+    if (!Number.isFinite(bytes) || (bytes <= 0)) {
+      return ``
+    }
+
+    let kb = bytes / 1024
+
+    if (kb < 1024) {
+      return `${kb.toFixed(1)} KB`
+    }
+
+    let mb = kb / 1024
+
+    if (mb < 1024) {
+      return `${mb.toFixed(1)} MB`
+    }
+
+    return `${(mb / 1024).toFixed(1)} GB`
+  }
+
+  // Format average bitrate from file size (bytes) and duration (seconds)
+  static format_bitrate = (bytes, duration) => {
+    if (!Number.isFinite(bytes) || (bytes <= 0) || !Number.isFinite(duration) || (duration <= 0)) {
+      return ``
+    }
+
+    let kbps = (bytes * 8) / duration / 1000
+
+    if (kbps >= 1000) {
+      return `${(kbps / 1000).toFixed(1)} Mbps`
+    }
+
+    return `${Math.round(kbps)} kbps`
+  }
+
   // Extract a readable basename from a URL or path (ignoring blob:/data: URLs)
   static extract_filename = (src) => {
     if (!src) {
@@ -269,6 +305,9 @@ class PerfectPlayer {
     this.info_end_timeout = undefined
     this.info_hold_timeout = undefined
     this.holding_info = false
+    this.file_size = 0
+    this.size_src = ``
+    this.size_abort = undefined
     this.frame_request = undefined
     this.seek_request = undefined
     this.restore_check_request = undefined
@@ -394,8 +433,14 @@ class PerfectPlayer {
                   </span>
                   <span class="pvp_resolution"></span>
                 </span>
-                <span class="pvp_time_info">
-                  <span class="pvp_time_info_text"></span>
+                <span class="pvp_time_bottom">
+                  <span class="pvp_time_info">
+                    <span class="pvp_time_info_text"></span>
+                  </span>
+                  <span class="pvp_time_meta">
+                    <span class="pvp_file_size"></span>
+                    <span class="pvp_bitrate"></span>
+                  </span>
                 </span>
               </button>
               <div class="pvp_center">
@@ -440,8 +485,8 @@ class PerfectPlayer {
       `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
       `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
       `play_icon`, `fullscreen`, `time`, `time_info`, `time_info_text`,
-      `resolution`, `current`, `duration`, `volume`, `vol_down`, `vol_up`,
-      `vol_label`,
+      `resolution`, `file_size`, `bitrate`, `current`, `duration`, `volume`,
+      `vol_down`, `vol_up`, `vol_label`,
     ]
 
     for (let name of names) {
@@ -465,11 +510,12 @@ class PerfectPlayer {
         this.sync_visibility()
         this.sync_overlay()
         this.update_filename()
+        this.update_file_size()
       })
 
       this.mutation_observer.observe(this.video, {
         attributes: true,
-        attributeFilter: [`class`, `style`, `hidden`, `src`, `data-pvp-title`],
+        attributeFilter: [`class`, `style`, `hidden`, `src`, `data-pvp-title`, `data-pvp-size`],
       })
     }
 
@@ -549,6 +595,7 @@ class PerfectPlayer {
       video.addEventListener(event, () => {
         this.hide_info(false)
         this.update_filename()
+        this.update_file_size()
       }, {signal})
     }
 
@@ -565,7 +612,7 @@ class PerfectPlayer {
       }, {signal})
     }
 
-    for (let event of [`progress`, `loadeddata`, `canplay`, `canplaythrough`]) {
+    for (let event of [`progress`, `loadeddata`, `canplay`, `canplaythrough`, `suspend`]) {
       video.addEventListener(event, () => {
         this.update_buffer()
       }, {signal})
@@ -1384,6 +1431,11 @@ class PerfectPlayer {
   // LCD info ticker
   // ---------------------------------------------------------------------
 
+  get_source_url = () => {
+    let source = this.video.querySelector(`source[src]`)
+    return this.video.currentSrc || this.video.getAttribute(`src`) || (source ? source.getAttribute(`src`) : ``)
+  }
+
   get_filename = () => {
     if (`pvpTitle` in this.video.dataset) {
       let custom = this.video.dataset.pvpTitle.trim()
@@ -1393,9 +1445,7 @@ class PerfectPlayer {
       }
     }
 
-    let source = this.video.querySelector(`source[src]`)
-    let src = this.video.currentSrc || this.video.getAttribute(`src`) || (source ? source.getAttribute(`src`) : ``)
-    return PerfectPlayer.extract_filename(src)
+    return PerfectPlayer.extract_filename(this.get_source_url())
   }
 
   show_filename = () => {
@@ -1419,6 +1469,7 @@ class PerfectPlayer {
     let info = this.els.time_info
     let text_el = this.els.time_info_text
     let is_custom = content !== this.get_filename()
+    let was_truncated = !is_custom && (text_el.scrollWidth > info.clientWidth)
     text_el.style.transition = ``
     text_el.style.transform = ``
     text_el.textContent = content
@@ -1426,7 +1477,7 @@ class PerfectPlayer {
     let overflow = Math.ceil(text_el.scrollWidth - info.clientWidth)
 
     if ((overflow <= 0) || this.reduced_motion) {
-      if (!is_custom) {
+      if (!is_custom && !was_truncated) {
         time.classList.remove(`pvp_scrolling`)
         return
       }
@@ -1515,10 +1566,18 @@ class PerfectPlayer {
     this.update_play_state()
     this.update_filename()
     this.update_resolution()
+    this.update_file_size()
+    this.update_meta()
     this.update_progress()
     this.update_buffer()
     this.update_volume()
     this.update_fullscreen()
+  }
+
+  update_has_info = () => {
+    let has_name = Boolean(this.els.time_info_text.textContent)
+    let has_meta = Boolean(this.els.file_size.textContent || this.els.bitrate.textContent)
+    this.els.time.classList.toggle(`pvp_has_info`, has_name || has_meta)
   }
 
   update_filename = () => {
@@ -1528,13 +1587,100 @@ class PerfectPlayer {
 
     let name = this.get_filename()
     this.els.time_info_text.textContent = name
-    this.els.time.classList.toggle(`pvp_has_info`, Boolean(name))
     this.els.time.title = name || ``
+    this.update_has_info()
   }
 
   update_resolution = () => {
     let badge = PerfectPlayer.format_resolution(this.video.videoWidth, this.video.videoHeight)
     this.els.resolution.textContent = badge
+  }
+
+  // Read file size from data-pvp-size or fetch it via HEAD / blob without downloading the video
+  update_file_size = () => {
+    if (`pvpSize` in this.video.dataset) {
+      let raw = Number(this.video.dataset.pvpSize)
+
+      if (Number.isFinite(raw) && (raw > 0)) {
+        if (this.size_abort) {
+          this.size_abort.abort()
+          this.size_abort = undefined
+        }
+
+        this.size_src = ``
+        this.file_size = raw
+        this.update_meta()
+        return
+      }
+    }
+
+    let src = this.get_source_url().trim()
+
+    if (!src || /^data:/i.test(src)) {
+      if (this.size_abort) {
+        this.size_abort.abort()
+        this.size_abort = undefined
+      }
+
+      this.size_src = ``
+      this.file_size = 0
+      this.update_meta()
+      return
+    }
+
+    if (src === this.size_src) {
+      return
+    }
+
+    if (this.size_abort) {
+      this.size_abort.abort()
+    }
+
+    this.size_src = src
+    this.file_size = 0
+    this.update_meta()
+    let controller = new AbortController()
+    this.size_abort = controller
+    let signal = controller.signal
+
+    let load_size = async () => {
+      try {
+        let bytes = 0
+
+        if (/^blob:/i.test(src)) {
+          let res = await fetch(src, {signal})
+          let blob = await res.blob()
+          bytes = blob.size
+        }
+        else {
+          let res = await fetch(src, {method: `HEAD`, signal})
+          let len = res.headers.get(`content-length`)
+          bytes = len ? Number(len) : 0
+        }
+
+        if (signal.aborted || (this.size_src !== src)) {
+          return
+        }
+
+        if (Number.isFinite(bytes) && (bytes > 0)) {
+          this.file_size = bytes
+          this.update_meta()
+        }
+      }
+      catch (err) {
+        // Ignore network/CORS/abort errors; size & bitrate simply stay hidden
+      }
+    }
+
+    load_size()
+  }
+
+  update_meta = () => {
+    let size = PerfectPlayer.format_size(this.file_size)
+    let bitrate = PerfectPlayer.format_bitrate(this.file_size, this.video.duration)
+    this.els.file_size.textContent = size
+    this.els.bitrate.textContent = bitrate
+    this.update_has_info()
   }
 
   // Use the real aspect ratio of the video once it's known
@@ -1638,7 +1784,18 @@ class PerfectPlayer {
       }
     }
 
-    let ratio = this.can_seek() ? (end / video.duration) : 0
+    let ratio = 0
+
+    if (this.can_seek() && (end > 0)) {
+      ratio = end / video.duration
+
+      // Snap to 100% when buffered end is just shy of container duration
+      // (audio/video tracks often end a fraction of a second apart)
+      if (((video.duration - end) <= 0.5) || ((video.networkState === 1) && (ratio >= 0.95))) {
+        ratio = 1
+      }
+    }
+
     this.els.seek_buffer.style.width = `${PerfectPlayer.clamp(ratio, 0, 1) * 100}%`
   }
 
@@ -1787,6 +1944,12 @@ class PerfectPlayer {
   // Remove the player and put the original <video> back in its place
   destroy = () => {
     this.abort.abort()
+
+    if (this.size_abort) {
+      this.size_abort.abort()
+      this.size_abort = undefined
+    }
+
     this.clear_hide()
     this.clear_click_toggle()
     this.hide_info(false)

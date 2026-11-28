@@ -11,7 +11,7 @@ App.init = () => {
 }
 
 // Swap the source of the main video
-App.load_source = (src, title = ``) => {
+App.load_source = (src, title = ``, size = 0) => {
   let video = document.querySelector(`#main_video`)
   video.removeAttribute(`poster`)
 
@@ -20,6 +20,13 @@ App.load_source = (src, title = ``) => {
   }
   else {
     delete video.dataset.pvpTitle
+  }
+
+  if (size > 0) {
+    video.dataset.pvpSize = String(size)
+  }
+  else {
+    delete video.dataset.pvpSize
   }
 
   video.src = src
@@ -31,7 +38,7 @@ App.setup_loader = () => {
     let file = e.target.files[0]
 
     if (file) {
-      App.load_source(URL.createObjectURL(file), file.name)
+      App.load_source(URL.createObjectURL(file), file.name, file.size)
     }
   })
 

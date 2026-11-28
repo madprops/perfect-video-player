@@ -43,8 +43,9 @@ some random point of the video.
   - mouse wheel over the volume area changes it by 2%.
   - The volume is remembered between visits.
 - **Two-row VFD display** on the bottom left showing time (`2:36 / 10:00`),
-  resolution badge (`1080p` / `4K`), and filename at the same time. Clicking it
-  ticker-scrolls long filenames once (holding controls open up to 5 seconds).
+  resolution badge (`1080p` / `4K`), filename, file size (`46.3 MB`), and
+  bitrate (`4.2 Mbps`). Clicking it expands and ticker-scrolls long filenames
+  once (holding controls open up to 5 seconds).
 - **Click empty video space to play/pause, double-click for fullscreen.**
   Single-clicking the empty video area toggles playback (with clean centered
   feedback) and double-clicking it toggles fullscreen. Clicking or

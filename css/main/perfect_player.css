@@ -871,7 +871,7 @@
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  width: min(100%, clamp(165px, 28cqw, 260px));
+  width: min(100%, clamp(180px, 31cqw, 310px));
   max-width: 100%;
   min-width: 0;
   height: var(--pvp_display_h);
@@ -944,18 +944,55 @@
   display: none;
 }
 
-.pvp_time_info {
+.pvp_time_bottom {
   position: relative;
   z-index: 1;
   display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
-  overflow: hidden;
-  text-align: left;
+  min-width: 0;
   pointer-events: none;
 }
 
-.pvp_time.pvp_has_info .pvp_time_info {
-  display: block;
+.pvp_time.pvp_has_info .pvp_time_bottom {
+  display: flex;
+}
+
+.pvp_time_info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.pvp_time_meta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  font-size: clamp(9px, 1.08cqw, 10.5px);
+  font-weight: normal;
+  line-height: 1.15;
+  color: var(--pvp_lcd_dim);
+  opacity: 0.85;
+  text-shadow: 0 0 4px rgba(88, 214, 255, 0.3);
+}
+
+.pvp_file_size:empty,
+.pvp_bitrate:empty {
+  display: none;
+}
+
+.pvp_file_size:not(:empty) + .pvp_bitrate:not(:empty)::before {
+  content: "·";
+  margin: 0 4px;
+  opacity: 0.55;
+}
+
+/* Give a ticker-scrolling filename the full width of the VFD screen */
+.pvp_time.pvp_scrolling .pvp_time_meta {
+  display: none;
 }
 
 .pvp_time_info_text {
@@ -1039,7 +1076,11 @@
 
   .pvp_time {
     width: auto;
-    max-width: clamp(130px, 34cqw, 185px);
+    max-width: clamp(140px, 36cqw, 200px);
+  }
+
+  .pvp_bitrate {
+    display: none;
   }
 
   .pvp_rewind_long,
@@ -1049,7 +1090,8 @@
 }
 
 @container (max-width: 520px) {
-  .pvp_resolution {
+  .pvp_resolution,
+  .pvp_time_meta {
     display: none;
   }
 }
@@ -1087,7 +1129,7 @@
     font-size: 11.5px;
   }
 
-  .pvp_time.pvp_has_info .pvp_time_info {
+  .pvp_time.pvp_has_info .pvp_time_bottom {
     display: none;
   }
 }
