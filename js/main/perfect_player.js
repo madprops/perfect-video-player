@@ -40,7 +40,7 @@ class PerfectPlayer {
     // Seconds to skip with the -1m/+1m buttons
     seek_step_long: 60,
     // Hide controls this many ms after the cursor leaves the player
-    hide_delay_leave: 500,
+    hide_delay_leave: 1000,
     // Hide controls this many ms after the cursor stops moving over empty video
     hide_delay_idle: 2000,
     // Ignore pointer movement for this many ms after entering fullscreen
