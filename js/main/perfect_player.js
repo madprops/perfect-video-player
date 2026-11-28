@@ -879,11 +879,12 @@ class PerfectPlayer {
       this.update_fullscreen()
     })
 
-    // A subtle centered press pulse on every button, and return focus to the
-    // player root after pointer clicks so Spacebar stays bound to play/pause
+    // A subtle press pulse on every button (centered on buttons, at pointer on
+    // the wide info display), and return focus to the player root after clicks
+    // so Spacebar stays bound to play/pause
     for (let button of this.root.querySelectorAll(`.pvp_button, .pvp_vol_label, .pvp_time`)) {
-      button.addEventListener(`pointerdown`, () => {
-        this.ripple(button)
+      button.addEventListener(`pointerdown`, (e) => {
+        this.ripple(button, e)
       })
 
       button.addEventListener(`click`, (e) => {
@@ -1993,8 +1994,9 @@ class PerfectPlayer {
     this.spark(ratio, 0.7)
   }
 
-  // Centered light pulse across a button when pressed
-  ripple = (button) => {
+  // Light pulse across a button when pressed (centered on buttons, at click
+  // position on the wide info display)
+  ripple = (button, e) => {
     if (this.reduced_motion) {
       return
     }
@@ -2008,6 +2010,12 @@ class PerfectPlayer {
 
     let el = document.createElement(`span`)
     el.className = `pvp_ripple`
+
+    if (e && button.classList.contains(`pvp_time`)) {
+      let rect = target.getBoundingClientRect()
+      el.style.left = `${e.clientX - rect.left}px`
+      el.style.top = `${e.clientY - rect.top}px`
+    }
 
     el.addEventListener(`animationend`, () => {
       el.remove()
