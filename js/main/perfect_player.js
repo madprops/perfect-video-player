@@ -44,7 +44,7 @@ class PerfectPlayer {
     // Hide controls this many ms after the cursor stops moving over empty video
     hide_delay_idle: 2000,
     // Ignore pointer movement for this many ms after entering fullscreen
-    fullscreen_hide_block: 500,
+    fullscreen_hide_block: 800,
     // Max ms the LCD info ticker can hold controls open before allowing autohide
     info_hide_block: 12000,
     // Single click on empty video space toggles play/pause
