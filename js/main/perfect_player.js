@@ -46,7 +46,7 @@ class PerfectPlayer {
     // Ignore pointer movement for this many ms after entering fullscreen
     fullscreen_hide_block: 500,
     // Max ms the LCD info ticker can hold controls open before allowing autohide
-    info_hide_block: 10000,
+    info_hide_block: 12000,
     // Single click on empty video space toggles play/pause
     click_to_play: true,
     // Remember the volume across page loads with localStorage
