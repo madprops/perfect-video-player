@@ -585,7 +585,7 @@
   justify-self: end;
   display: flex;
   align-items: center;
-  gap: clamp(8px, 1.4cqw, 14px);
+  gap: clamp(14px, 2.8cqw, 26px);
 }
 
 /* ----------------------------------------------------------------------
@@ -930,68 +930,9 @@
    ---------------------------------------------------------------------- */
 
 .pvp_volume {
-  --pvp_vol: 100%;
-
   display: flex;
   align-items: center;
-  gap: clamp(5px, 0.9cqw, 8px);
-}
-
-/* Horizontal margin keeps the thumb clear of the -/+ buttons at 0% and 100% */
-.pvp_vol_slider {
-  position: relative;
-  width: clamp(56px, 11cqw, 120px);
-  height: var(--pvp_ctrl_h);
-  margin: 0 7px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.pvp_vol_track {
-  position: relative;
-  width: 100%;
-  height: 8px;
-  border-radius: 5px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(4, 7, 12, 0.85), rgba(26, 34, 48, 0.8));
-  box-shadow:
-    inset 0 2px 3px rgba(0, 0, 0, 0.8),
-    0 0 0 1px rgba(0, 0, 0, 0.6),
-    0 1px 0 1px rgba(255, 255, 255, 0.2);
-}
-
-/* Winamp style green -> yellow -> orange, clipped so colors stay fixed */
-.pvp_vol_fill {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 55%),
-    linear-gradient(90deg, #2fd27a 0%, #c9e64a 65%, #ff8a3d 100%);
-  clip-path: inset(0 calc(100% - var(--pvp_vol)) 0 0);
-}
-
-.pvp_vol_thumb {
-  position: absolute;
-  top: 50%;
-  left: var(--pvp_vol);
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle at 35% 28%, #ffffff 0%, #e2e7ee 30%, #9aa5b5 70%, #5d6878 100%);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.55),
-    0 2px 4px rgba(0, 0, 0, 0.55),
-    inset 0 1px 1px rgba(255, 255, 255, 0.9);
-  pointer-events: none;
-  transition: transform 0.12s ease;
-}
-
-.pvp_vol_slider:hover .pvp_vol_thumb,
-.pvp_vol_dragging .pvp_vol_thumb {
-  transform: translate(-50%, -50%) scale(1.15);
+  gap: clamp(4px, 0.7cqw, 6px);
 }
 
 .pvp_vol_label {
@@ -1025,29 +966,11 @@
   text-shadow: 0 0 6px rgba(255, 110, 90, 0.6);
 }
 
-.pvp_muted .pvp_vol_fill {
-  filter: grayscale(1) brightness(0.6);
-}
-
-.pvp_vol_label.pvp_bump {
-  animation: pvp_bump 0.18s ease-out;
-}
-
-@keyframes pvp_bump {
-  from {
-    transform: scale(1.12);
-  }
-
-  to {
-    transform: scale(1);
-  }
-}
-
 /* ----------------------------------------------------------------------
    Small players
    ---------------------------------------------------------------------- */
 
-@container (max-width: 720px) {
+@container (max-width: 620px) {
   .pvp_panel {
     grid-template-columns: auto 1fr auto;
   }
@@ -1058,7 +981,7 @@
   }
 }
 
-@container (max-width: 560px) {
+@container (max-width: 480px) {
   .pvp_controls {
     --pvp_ctrl_radius: 6px;
   }
@@ -1073,11 +996,7 @@
   }
 }
 
-@container (max-width: 460px) {
-  .pvp_vol_slider {
-    display: none;
-  }
-
+@container (max-width: 420px) {
   .pvp_seek_tip {
     padding: 3px 8px;
     font-size: 13px;
@@ -1116,8 +1035,7 @@
   }
 
   .pvp_flash.pvp_flash_on,
-  .pvp_play_icon.pvp_pop,
-  .pvp_vol_label.pvp_bump {
+  .pvp_play_icon.pvp_pop {
     animation: none;
   }
 

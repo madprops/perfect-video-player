@@ -25,7 +25,7 @@ some random point of the video.
 │                          ( ▶ )                              │  ← play/pause feedback in the center
 │                                                             │
 ├━━━━━━━━━━━━━━━━━━━●─────────────────────────────────────────┤  ← full-width seekbar directly above the panel
-│ [«1m][‹10s] [▶] [10s›][1m»]   2:36 / 10:00   [-]━●[+]  64 [⛶]│  ← panel
+│ [«1m][‹10s] [▶] [10s›][1m»]   2:36 / 10:00    [-] 64 [+]  [⛶]│  ← panel
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -39,9 +39,7 @@ some random point of the video.
   rewind and forward buttons (`« 1m`, `‹ 10s`, `▶`, `10s ›`, `1m »`) when there
   is room (outer `1m` buttons hide first on narrower players, then `10s`).
 - **Volume and a compact fullscreen button** on the bottom right:
-  - a `-` button and a `+` button (5% steps, hold to repeat, middle-click for 0% / 100%),
-  - a regular clickable/draggable slider,
-  - a label with the exact percentage (click it to mute),
+  - `-` and `+` buttons (5% steps, hold to repeat, middle-click for 0 / 100) flanking a numeric LCD readout (click it to mute),
   - mouse wheel over the volume area changes it by 2%.
   - The volume is remembered between visits.
 - **Big, readable LCD display** (`2:36 / 10:00`) in the middle of the panel.

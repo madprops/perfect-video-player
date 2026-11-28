@@ -9,7 +9,7 @@
   - A big play/pause button on the bottom left, flanked by skip buttons
     (-1m / -10s / play / +10s / +1m) when there is room.
   - Volume and a compact fullscreen button on the bottom right, with -5% / +5%
-    buttons, a clickable slider, a percentage label, and mouse wheel support.
+    buttons around a numeric LCD readout and mouse wheel support.
   - A big, readable "current / duration" label in the middle of the panel.
   - A single click on empty video space toggles play/pause,
     a double click toggles fullscreen.
@@ -256,7 +256,6 @@ class PerfectPlayer {
     this.resize_observer = undefined
     this.mutation_observer = undefined
     this.dragging_seek = false
-    this.dragging_volume = false
     this.drag_ratio = 0
     this.seek_dirty = false
     this.last_spark = 0
@@ -396,12 +395,8 @@ class PerfectPlayer {
               <div class="pvp_right">
                 <div class="pvp_volume" title="Volume (wheel, Up/Down)">
                   <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
-                  <div class="pvp_vol_slider" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100">
-                    <div class="pvp_vol_track"><div class="pvp_vol_fill"></div></div>
-                    <div class="pvp_vol_thumb"></div>
-                  </div>
-                  <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
                   <button class="pvp_vol_label" type="button" title="Mute (M)">100</button>
+                  <button class="pvp_button pvp_vol_up" type="button" aria-label="Volume up" title="Volume up (middle-click: 100%)">${icons.plus}</button>
                 </div>
                 ${fs_button}
               </div>
@@ -422,8 +417,7 @@ class PerfectPlayer {
       `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
       `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
       `play_icon`, `fullscreen`, `time`, `time_info`, `time_info_text`,
-      `current`, `duration`, `volume`, `vol_down`, `vol_slider`, `vol_fill`,
-      `vol_thumb`, `vol_up`, `vol_label`,
+      `current`, `duration`, `volume`, `vol_down`, `vol_up`, `vol_label`,
     ]
 
     for (let name of names) {
@@ -768,7 +762,7 @@ class PerfectPlayer {
     }
   }
 
-  // Volume: -/+ buttons (hold to repeat, middle-click for min/max), slider, label, wheel
+  // Volume: -/+ buttons (hold to repeat, middle-click for min/max), label, wheel
   setup_volume = () => {
     let step = this.options.volume_step
 
@@ -785,7 +779,6 @@ class PerfectPlayer {
           e.preventDefault()
           this.stop_repeat()
           this.set_volume(extreme)
-          this.bump_volume()
           return
         }
 
@@ -823,40 +816,6 @@ class PerfectPlayer {
 
     hold(this.els.vol_down, -step, 0)
     hold(this.els.vol_up, step, 100)
-    let slider = this.els.vol_slider
-
-    slider.addEventListener(`pointerdown`, (e) => {
-      if (e.button !== 0) {
-        return
-      }
-
-      e.preventDefault()
-      slider.setPointerCapture(e.pointerId)
-      this.dragging_volume = true
-      this.root.classList.add(`pvp_vol_dragging`)
-      this.clear_hide()
-      this.set_volume(this.volume_ratio(e) * 100)
-    })
-
-    slider.addEventListener(`pointermove`, (e) => {
-      if (this.dragging_volume) {
-        this.set_volume(this.volume_ratio(e) * 100)
-      }
-    })
-
-    let end_drag = () => {
-      if (!this.dragging_volume) {
-        return
-      }
-
-      this.dragging_volume = false
-      this.root.classList.remove(`pvp_vol_dragging`)
-      this.schedule_hide(this.options.hide_delay_idle)
-    }
-
-    for (let event of [`pointerup`, `pointercancel`, `lostpointercapture`]) {
-      slider.addEventListener(event, end_drag)
-    }
 
     this.els.vol_label.addEventListener(`click`, () => {
       this.toggle_mute()
@@ -1167,17 +1126,8 @@ class PerfectPlayer {
     this.update_volume()
   }
 
-  bump_volume = () => {
-    this.els.vol_label.classList.remove(`pvp_bump`)
-
-    // Force a reflow so the bump animation restarts on every change
-    void this.els.vol_label.offsetWidth
-    this.els.vol_label.classList.add(`pvp_bump`)
-  }
-
   change_volume = (amount) => {
     this.set_volume(this.get_volume() + amount)
-    this.bump_volume()
   }
 
   toggle_mute = () => {
@@ -1362,7 +1312,7 @@ class PerfectPlayer {
 
   hide_controls = (force = false) => {
     // Never hide during a drag, while resting on controls, or while LCD info holds controls open
-    if (!force && (this.dragging_seek || this.dragging_volume || this.over_controls || this.holding_info)) {
+    if (!force && (this.dragging_seek || this.over_controls || this.holding_info)) {
       return
     }
 
@@ -1498,7 +1448,7 @@ class PerfectPlayer {
 
     this.holding_info = false
 
-    if (!resume_hide || this.is_idle() || this.over_controls || this.dragging_seek || this.dragging_volume) {
+    if (!resume_hide || this.is_idle() || this.over_controls || this.dragging_seek) {
       return
     }
 
@@ -1643,10 +1593,6 @@ class PerfectPlayer {
   update_volume = () => {
     let percent = this.get_volume()
     let muted = this.video.muted || (percent === 0)
-    // The fill and thumb read this variable (see perfect_player.css)
-    this.els.volume.style.setProperty(`--pvp_vol`, `${percent}%`)
-
-    this.els.vol_slider.setAttribute(`aria-valuenow`, percent)
     this.els.vol_label.textContent = this.video.muted ? `MUTE` : String(percent)
     this.els.vol_label.setAttribute(`aria-label`, this.video.muted ? `Unmute` : `Mute`)
     this.els.volume.classList.toggle(`pvp_muted`, muted)
@@ -1699,11 +1645,6 @@ class PerfectPlayer {
   // Horizontal position of a pointer event on the seek track, from 0 to 1
   seek_ratio = (e) => {
     let rect = this.els.seek_track.getBoundingClientRect()
-    return PerfectPlayer.clamp((e.clientX - rect.left) / rect.width, 0, 1)
-  }
-
-  volume_ratio = (e) => {
-    let rect = this.els.vol_slider.getBoundingClientRect()
     return PerfectPlayer.clamp((e.clientX - rect.left) / rect.width, 0, 1)
   }
 
