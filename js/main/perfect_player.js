@@ -6,11 +6,12 @@
 
   Design goals:
   - A full-width seekbar directly above the bottom panel, big and easy to drag.
-  - A big play/pause button on the bottom left, flanked by skip buttons
+  - A two-row VFD display on the bottom left showing time, resolution, and
+    filename (click to ticker-scroll long filenames).
+  - A big play/pause button in the center, flanked by skip buttons
     (-1m / -10s / play / +10s / +1m) when there is room.
   - Volume and a compact fullscreen button on the bottom right, with -5% / +5%
-    buttons around a numeric LCD readout and mouse wheel support.
-  - A big, readable "current / duration" label in the middle of the panel.
+    buttons around a numeric VFD readout and mouse wheel support.
   - A single click on empty video space toggles play/pause,
     a double click toggles fullscreen.
   - Controls hide 0.5 seconds after the cursor leaves the player,
@@ -189,6 +190,25 @@ class PerfectPlayer {
     return `${secs}s`
   }
 
+  // Format video dimensions as a short resolution badge like "1080p" or "4K"
+  static format_resolution = (width, height) => {
+    if (!width || !height) {
+      return ``
+    }
+
+    let short_side = Math.min(width, height)
+
+    if (short_side >= 4320) {
+      return `8K`
+    }
+
+    if (short_side >= 2160) {
+      return `4K`
+    }
+
+    return `${short_side}p`
+  }
+
   // Extract a readable basename from a URL or path (ignoring blob:/data: URLs)
   static extract_filename = (src) => {
     if (!src) {
@@ -365,7 +385,20 @@ class PerfectPlayer {
               </div>
             </div>
             <div class="pvp_panel">
-              <div class="pvp_left">
+              <button class="pvp_time" type="button" aria-live="off">
+                <span class="pvp_time_top">
+                  <span class="pvp_time_numbers">
+                    <span class="pvp_current">0:00</span>
+                    <span class="pvp_separator">/</span>
+                    <span class="pvp_duration">0:00</span>
+                  </span>
+                  <span class="pvp_resolution"></span>
+                </span>
+                <span class="pvp_time_info">
+                  <span class="pvp_time_info_text"></span>
+                </span>
+              </button>
+              <div class="pvp_center">
                 <button class="pvp_button pvp_skip pvp_rewind_long" type="button" aria-label="Rewind ${long_step}" title="Rewind ${long_step}">
                   ${icons.rewind}<span>${long_step}</span>
                 </button>
@@ -382,16 +415,6 @@ class PerfectPlayer {
                   <span>${long_step}</span>${icons.forward}
                 </button>
               </div>
-              <button class="pvp_time" type="button" aria-live="off" title="Show filename">
-                <span class="pvp_time_numbers">
-                  <span class="pvp_current">0:00</span>
-                  <span class="pvp_separator">/</span>
-                  <span class="pvp_duration">0:00</span>
-                </span>
-                <span class="pvp_time_info" aria-hidden="true">
-                  <span class="pvp_time_info_text"></span>
-                </span>
-              </button>
               <div class="pvp_right">
                 <div class="pvp_volume" title="Volume (wheel, Up/Down)">
                   <button class="pvp_button pvp_vol_down" type="button" aria-label="Volume down" title="Volume down (middle-click: 0%)">${icons.minus}</button>
@@ -417,7 +440,8 @@ class PerfectPlayer {
       `forward_long`, `seek`, `seek_track`, `seek_buffer`, `seek_hover`,
       `seek_fill`, `seek_thumb`, `seek_tip`, `sparks`, `panel`, `play`,
       `play_icon`, `fullscreen`, `time`, `time_info`, `time_info_text`,
-      `current`, `duration`, `volume`, `vol_down`, `vol_up`, `vol_label`,
+      `resolution`, `current`, `duration`, `volume`, `vol_down`, `vol_up`,
+      `vol_label`,
     ]
 
     for (let name of names) {
@@ -440,11 +464,12 @@ class PerfectPlayer {
       this.mutation_observer = new MutationObserver(() => {
         this.sync_visibility()
         this.sync_overlay()
+        this.update_filename()
       })
 
       this.mutation_observer.observe(this.video, {
         attributes: true,
-        attributeFilter: [`class`, `style`, `hidden`],
+        attributeFilter: [`class`, `style`, `hidden`, `src`, `data-pvp-title`],
       })
     }
 
@@ -522,9 +547,15 @@ class PerfectPlayer {
 
     for (let event of [`loadstart`, `emptied`]) {
       video.addEventListener(event, () => {
-        this.hide_info()
+        this.hide_info(false)
+        this.update_filename()
       }, {signal})
     }
+
+    video.addEventListener(`resize`, () => {
+      this.update_ratio()
+      this.update_resolution()
+    }, {signal})
 
     for (let event of [`durationchange`, `loadedmetadata`, `emptied`]) {
       video.addEventListener(event, () => {
@@ -735,7 +766,7 @@ class PerfectPlayer {
     }
 
     this.els.time.addEventListener(`click`, () => {
-      if (this.els.time.classList.contains(`pvp_showing_info`)) {
+      if (this.els.time.classList.contains(`pvp_scrolling`)) {
         this.hide_info()
         return
       }
@@ -1375,7 +1406,7 @@ class PerfectPlayer {
     }
   }
 
-  // Temporarily show text in the center LCD display, scrolling once if it overflows
+  // Temporarily display or ticker-scroll text in the bottom row of the VFD screen
   show_info = (text) => {
     let content = String(text || ``).trim()
 
@@ -1384,23 +1415,25 @@ class PerfectPlayer {
     }
 
     this.clear_info_timers()
-    this.show_controls()
-    this.clear_hide()
-    this.start_info_hold()
     let time = this.els.time
     let info = this.els.time_info
     let text_el = this.els.time_info_text
+    let is_custom = content !== this.get_filename()
     text_el.style.transition = ``
     text_el.style.transform = ``
-    info.style.justifyContent = ``
     text_el.textContent = content
-    time.classList.add(`pvp_showing_info`)
+    time.classList.add(`pvp_has_info`, `pvp_scrolling`)
     let overflow = Math.ceil(text_el.scrollWidth - info.clientWidth)
 
     if ((overflow <= 0) || this.reduced_motion) {
-      if (overflow <= 0) {
-        info.style.justifyContent = `center`
+      if (!is_custom) {
+        time.classList.remove(`pvp_scrolling`)
+        return
       }
+
+      this.show_controls()
+      this.clear_hide()
+      this.start_info_hold()
 
       this.info_end_timeout = setTimeout(() => {
         this.info_end_timeout = undefined
@@ -1410,8 +1443,10 @@ class PerfectPlayer {
       return
     }
 
-    info.style.justifyContent = `flex-start`
-    let start_pause = 650
+    this.show_controls()
+    this.clear_hide()
+    this.start_info_hold()
+    let start_pause = 350
     let end_pause = 850
     let scroll_ms = Math.round(Math.max(1000, (overflow / 55) * 1000))
 
@@ -1465,11 +1500,10 @@ class PerfectPlayer {
 
   hide_info = (resume_hide = true) => {
     this.clear_info_timers()
-    this.els.time.classList.remove(`pvp_showing_info`)
-    this.els.time_info.style.justifyContent = ``
+    this.els.time.classList.remove(`pvp_scrolling`)
     this.els.time_info_text.style.transition = ``
     this.els.time_info_text.style.transform = ``
-    this.els.time_info_text.textContent = ``
+    this.update_filename()
     this.release_info_hold(resume_hide)
   }
 
@@ -1479,10 +1513,28 @@ class PerfectPlayer {
 
   update_all = () => {
     this.update_play_state()
+    this.update_filename()
+    this.update_resolution()
     this.update_progress()
     this.update_buffer()
     this.update_volume()
     this.update_fullscreen()
+  }
+
+  update_filename = () => {
+    if (this.els.time.classList.contains(`pvp_scrolling`)) {
+      return
+    }
+
+    let name = this.get_filename()
+    this.els.time_info_text.textContent = name
+    this.els.time.classList.toggle(`pvp_has_info`, Boolean(name))
+    this.els.time.title = name || ``
+  }
+
+  update_resolution = () => {
+    let badge = PerfectPlayer.format_resolution(this.video.videoWidth, this.video.videoHeight)
+    this.els.resolution.textContent = badge
   }
 
   // Use the real aspect ratio of the video once it's known

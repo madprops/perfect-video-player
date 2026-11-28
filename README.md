@@ -25,7 +25,7 @@ some random point of the video.
 │                          ( ▶ )                              │  ← play/pause feedback in the center
 │                                                             │
 ├━━━━━━━━━━━━━━━━━━━●─────────────────────────────────────────┤  ← full-width seekbar directly above the panel
-│ [«1m][‹10s] [▶] [10s›][1m»]   2:36 / 10:00    [-] 64 [+]  [⛶]│  ← panel
+│ 2:36 / 10:00   [«1m][‹10s] [▶] [10s›][1m»]   [-] 64 [+]  [⛶]│  ← panel
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,7 +34,7 @@ some random point of the video.
 - **Full-width seekbar directly above the bottom panel.** Big, easy to click
   and drag across the full width of the player, with a big LCD timestamp above
   the bar on hover.
-- **Transport cluster on the bottom left:** a big play/pause button with a
+- **Transport cluster in the center:** a big play/pause button with a
   machined chrome bezel and glossy aqua core, flanked by quick `1m` / `10s`
   rewind and forward buttons (`« 1m`, `‹ 10s`, `▶`, `10s ›`, `1m »`) when there
   is room (outer `1m` buttons hide first on narrower players, then `10s`).
@@ -42,9 +42,9 @@ some random point of the video.
   - `-` and `+` buttons (5% steps, hold to repeat, middle-click for 0 / 100) flanking a numeric LCD readout (click it to mute),
   - mouse wheel over the volume area changes it by 2%.
   - The volume is remembered between visits.
-- **Big, readable LCD display** (`2:36 / 10:00`) in the middle of the panel.
-  Clicking it temporarily shows the video filename (scrolling once like a
-  ticker if it's wider than the display), then restores the time readout.
+- **Two-row VFD display** on the bottom left showing time (`2:36 / 10:00`),
+  resolution badge (`1080p` / `4K`), and filename at the same time. Clicking it
+  ticker-scrolls long filenames once (holding controls open up to 5 seconds).
 - **Click empty video space to play/pause, double-click for fullscreen.**
   Single-clicking the empty video area toggles playback (with clean centered
   feedback) and double-clicking it toggles fullscreen. Clicking or

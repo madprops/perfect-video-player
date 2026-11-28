@@ -22,11 +22,12 @@
   --pvp_accent_end: #0b4aa8;
   --pvp_glow: rgba(70, 185, 255, 0.65);
 
-  /* LCD readouts */
-  --pvp_lcd_text: #72ffa6;
-  --pvp_lcd_glow: rgba(90, 255, 160, 0.55);
-  --pvp_lcd_bg_top: #07110c;
-  --pvp_lcd_bg_low: #0e1f17;
+  /* VFD / LCD readouts */
+  --pvp_lcd_text: #8ceeff;
+  --pvp_lcd_dim: rgba(154, 224, 255, 0.72);
+  --pvp_lcd_glow: rgba(88, 214, 255, 0.55);
+  --pvp_lcd_bg_top: #050c17;
+  --pvp_lcd_bg_low: #0b192c;
 
   /* Silver buttons */
   --pvp_metal_1: #f6f8fb;
@@ -37,7 +38,8 @@
 
   /* Sizes (scale with the player width through container units) */
   --pvp_seek_height: clamp(11px, 1.8cqw, 17px);
-  --pvp_panel_height: clamp(44px, 6.6cqw, 58px);
+  --pvp_panel_height: clamp(46px, 6.8cqw, 58px);
+  --pvp_display_h: clamp(34px, 5cqw, 42px);
   --pvp_main_btn_w: clamp(38px, 5.4cqw, 50px);
   --pvp_main_btn_h: clamp(30px, 4.4cqw, 38px);
   --pvp_ctrl_h: clamp(26px, 4cqw, 32px);
@@ -539,7 +541,7 @@
   height: var(--pvp_panel_height);
   padding: 0 calc(var(--pvp_gap) + 4px);
   display: grid;
-  grid-template-columns: minmax(auto, 1fr) auto minmax(auto, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(auto, 1fr);
   align-items: center;
   gap: var(--pvp_gap);
   border-radius: 0;
@@ -549,8 +551,9 @@
   /* Layered metallic glass: overhead sheen, brushed grain, sapphire steel */
   background:
     radial-gradient(ellipse 68% 90% at 50% -15%, rgba(160, 215, 255, 0.36), transparent 70%),
-    radial-gradient(ellipse 40% 80% at 12% 110%, rgba(56, 170, 255, 0.22), transparent 70%),
-    radial-gradient(ellipse 40% 80% at 88% 110%, rgba(80, 225, 165, 0.16), transparent 70%),
+    radial-gradient(ellipse 40% 80% at 50% 110%, rgba(56, 170, 255, 0.22), transparent 70%),
+    radial-gradient(ellipse 36% 80% at 12% 110%, rgba(72, 200, 255, 0.16), transparent 70%),
+    radial-gradient(ellipse 36% 80% at 88% 110%, rgba(72, 200, 255, 0.16), transparent 70%),
     repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0 1px, rgba(0, 0, 0, 0.04) 1px 2px),
     linear-gradient(
       180deg,
@@ -574,8 +577,8 @@
   z-index: 1;
 }
 
-.pvp_left {
-  justify-self: start;
+.pvp_center {
+  justify-self: center;
   display: flex;
   align-items: center;
   gap: clamp(4px, 0.7cqw, 6px);
@@ -851,27 +854,33 @@
   background:
     repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 3px),
     linear-gradient(180deg, var(--pvp_lcd_bg_top), var(--pvp_lcd_bg_low));
-  border: 1px solid #000;
+  border: 1px solid #02060c;
   box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.9),
-    0 1px 0 rgba(255, 255, 255, 0.28);
+    inset 0 2px 7px rgba(0, 0, 0, 0.92),
+    inset 0 0 0 1px rgba(110, 210, 255, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.3);
   white-space: nowrap;
 }
 
 .pvp_time {
-  --pvp_time_pad: 0.6em;
+  --pvp_time_pad: clamp(8px, 1.2cqw, 11px);
 
   position: relative;
-  justify-self: center;
-  display: inline-flex;
-  align-items: center;
-  height: var(--pvp_ctrl_h);
+  justify-self: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: min(100%, clamp(165px, 28cqw, 260px));
+  max-width: 100%;
+  min-width: 0;
+  height: var(--pvp_display_h);
   min-height: 0;
   padding: 0 var(--pvp_time_pad);
   margin: 0;
   border-radius: var(--pvp_ctrl_radius);
-  font-size: clamp(13px, 2.1cqw, 19px);
   line-height: 1;
+  text-align: left;
   text-transform: none;
   appearance: none;
   -webkit-appearance: none;
@@ -880,41 +889,94 @@
   overflow: hidden;
 }
 
+/* Subtle top glass reflection across the recessed VFD display */
+.pvp_time::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 46%;
+  background: linear-gradient(180deg, rgba(190, 235, 255, 0.12), rgba(190, 235, 255, 0.01));
+  pointer-events: none;
+}
+
 .pvp_time:focus-visible {
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 0 2px var(--pvp_accent_mid);
+  box-shadow:
+    inset 0 2px 7px rgba(0, 0, 0, 0.92),
+    0 0 0 2px var(--pvp_accent_mid);
+}
+
+.pvp_time_top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
 }
 
 .pvp_time_numbers {
   display: flex;
-  align-items: center;
-  gap: 0.35em;
+  align-items: baseline;
+  gap: 0.3em;
+  font-size: clamp(12px, 1.55cqw, 15px);
+  line-height: 1;
 }
 
-.pvp_time.pvp_showing_info .pvp_time_numbers {
-  visibility: hidden;
+.pvp_resolution {
+  flex: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: clamp(8.5px, 1cqw, 10px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--pvp_lcd_text);
+  opacity: 0.82;
+  background: rgba(140, 238, 255, 0.1);
+  border: 1px solid rgba(140, 238, 255, 0.24);
+  text-shadow: none;
+}
+
+.pvp_resolution:empty {
+  display: none;
 }
 
 .pvp_time_info {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--pvp_time_pad);
-  right: var(--pvp_time_pad);
+  position: relative;
+  z-index: 1;
   display: none;
-  align-items: center;
+  width: 100%;
   overflow: hidden;
+  text-align: left;
   pointer-events: none;
 }
 
-.pvp_time.pvp_showing_info .pvp_time_info {
-  display: flex;
+.pvp_time.pvp_has_info .pvp_time_info {
+  display: block;
 }
 
 .pvp_time_info_text {
-  display: inline-block;
-  font-size: max(11px, 0.8em);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: clamp(9.5px, 1.15cqw, 11px);
+  font-weight: normal;
+  line-height: 1.15;
+  color: var(--pvp_lcd_dim);
+  text-shadow: 0 0 5px rgba(88, 214, 255, 0.35);
   will-change: transform;
+}
+
+.pvp_time.pvp_scrolling .pvp_time_info_text {
+  display: inline-block;
+  overflow: visible;
+  text-overflow: clip;
+  color: var(--pvp_lcd_text);
+  text-shadow: 0 0 6px var(--pvp_lcd_glow);
 }
 
 .pvp_separator {
@@ -975,8 +1037,19 @@
     grid-template-columns: auto 1fr auto;
   }
 
+  .pvp_time {
+    width: auto;
+    max-width: clamp(130px, 34cqw, 185px);
+  }
+
   .pvp_rewind_long,
   .pvp_forward_long {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .pvp_resolution {
     display: none;
   }
 }
@@ -1005,9 +1078,17 @@
 
 @container (max-width: 360px) {
   .pvp_time {
-    --pvp_time_pad: 0.45em;
+    --pvp_time_pad: 7px;
 
-    font-size: 12px;
+    height: var(--pvp_ctrl_h);
+  }
+
+  .pvp_time_numbers {
+    font-size: 11.5px;
+  }
+
+  .pvp_time.pvp_has_info .pvp_time_info {
+    display: none;
   }
 }
 
